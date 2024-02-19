@@ -176,9 +176,9 @@ async def query(request: QueryModel, x_request_id: str = Header(None, alias="X-R
     else:
         if not is_url(audio_url) and not is_base64(audio_url):
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid audio input!")
-        logger.debug("invoking audio url to text conversion")
+        print("invoking audio url to text conversion")
         reg_text, eng_text, error_message = process_incoming_voice(audio_url, language)
-        logger.debug("audio converted:: eng_text:: ", eng_text)
+        print("audio converted:: eng_text:: ", eng_text)
 
 
     tools = [voice_maker]
