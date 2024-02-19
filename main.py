@@ -163,6 +163,9 @@ async def query(request: QueryModel, x_request_id: str = Header(None, alias="X-R
         url="redis://172.17.0.1:6379/1", session_id=session_id
     )
 
+    eng_text = None
+    ai_assistant = None
+
     if (input_text is None or input_text == "") and (audio_url is None or audio_url == ""):
         raise HTTPException(status_code=422, detail="Either 'text' or 'audio' should be present!")
     elif input_text is not None and audio_url is not None and input_text != "" and audio_url != "":
@@ -202,12 +205,17 @@ async def query(request: QueryModel, x_request_id: str = Header(None, alias="X-R
 
     message_history.add_user_message(eng_text)
     try:
-        message_history.add_ai_message(llm_response["output"]["eng_text"])
+        ai_assistant = llm_response["output"]["eng_text"]
+        message_history.add_ai_message(ai_assistant)
         audio_output_url = llm_response["output"]["audio"]
     except:
+        ai_assistant = llm_response["output"]
         message_history.add_ai_message(llm_response["output"])
         response = llm_response['output']
         audio_output_url = process_outgoing_voice_manual(response, language)
+
+    if ai_assistant.startswith("Goodbye") and ai_assistant.endswith("See you soon!"):
+        message_history.clear()
 
     response = ResponseForQuery(output=OutputResponse(audio=audio_output_url))
     return response
