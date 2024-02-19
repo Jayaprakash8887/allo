@@ -2,6 +2,7 @@
 data
 input_data
 venv/
+alloenv/
 .DS_Store
 .idea/
 __pycache__/
