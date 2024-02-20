@@ -11,8 +11,10 @@ def process_incoming_voice(file_url: str, input_language: str):
     error_message = None
     try:
         regional_text = audio_input_to_text(file_url, input_language)
+        print("process_incoming_voice:: regional_text:: ", regional_text)
         try:
             english_text = indic_translation(text=regional_text, source=input_language, destination='en')
+            print("process_incoming_voice:: english_text:: ", english_text)
         except Exception as e:
             error_message = "Indic translation to English failed"
             logger.error(f"Exception occurred: {e}", exc_info=True)
