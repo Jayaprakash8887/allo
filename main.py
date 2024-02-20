@@ -52,7 +52,7 @@ async def shutdown_event():
 
 class OutputResponse(BaseModel):
     audio: str = None
-
+    text: str = None
 
 class ResponseForQuery(BaseModel):
     output: OutputResponse
@@ -169,6 +169,7 @@ async def query(request: QueryModel, x_request_id: str = Header(None, alias="X-R
 
     eng_text = None
     ai_assistant = None
+    ai_reg_text = None
 
     if (input_text is None or input_text == "") and (audio_url is None or audio_url == ""):
         raise HTTPException(status_code=422, detail="Either 'text' or 'audio' should be present!")
@@ -216,14 +217,15 @@ async def query(request: QueryModel, x_request_id: str = Header(None, alias="X-R
         ai_assistant = llm_response["output"]["eng_text"]
         message_history.add_ai_message(ai_assistant)
         audio_output_url = llm_response["output"]["audio"]
+        ai_reg_text = llm_response["output"]["reg_text"]
     except:
         ai_assistant = llm_response["output"]
         message_history.add_ai_message(llm_response["output"])
         response = llm_response['output']
-        audio_output_url = process_outgoing_voice_manual(response, language)
+        audio_output_url, ai_reg_text = process_outgoing_voice_manual(response, language)
 
     if ai_assistant.startswith("Goodbye") and ai_assistant.endswith("See you soon!"):
         message_history.clear()
 
-    response = ResponseForQuery(output=OutputResponse(audio=audio_output_url))
+    response = ResponseForQuery(output=OutputResponse(audio=audio_output_url, text=ai_reg_text))
     return response

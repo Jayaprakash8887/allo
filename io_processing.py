@@ -68,6 +68,6 @@ def process_outgoing_voice_manual(message: str, input_language: str):
         output_mp3_file = open(filename, "wb")
         output_mp3_file.write(decoded_audio_content)
         print(upload_file_object(output_mp3_file.name))
-        return give_public_url(output_mp3_file.name)
+        return give_public_url(output_mp3_file.name), translated_text
     else:
         raise HTTPException(500, "The voice conversion tool is not available")
