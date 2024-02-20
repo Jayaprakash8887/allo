@@ -158,9 +158,13 @@ async def query(request: QueryModel, x_request_id: str = Header(None, alias="X-R
     input_text = request.input.text
     session_id = request.input.session_id
 
+    redis_host = get_config_value('redis', 'redis_host', None)
+    redis_port = get_config_value('redis', 'redis_port', None)
+    redis_index = get_config_value('redis', 'redis_index', None)
+
     # setup Redis as a message store
     message_history = RedisChatMessageHistory(
-        url="redis://172.17.0.1:6379/1", session_id=session_id
+        url="redis://"+redis_host+":"+redis_port+"/"+redis_index, session_id=session_id
     )
 
     eng_text = None
