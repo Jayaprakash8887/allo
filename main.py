@@ -258,10 +258,7 @@ async def query(request: QueryModel, x_request_id: str = Header(None, alias="X-R
 
 
 @app.post("/v1/get_content", include_in_schema=True)
-async def get_content(request: GetContentRequest) -> GetContentResponse:
-    audio_output_url = None
-    ai_reg_text = None
-
+async def fetch_content(request: GetContentRequest) -> GetContentResponse:
     language_code_list = get_config_value('request', 'supported_lang_codes', None).split(",")
     if language_code_list is None:
         raise HTTPException(status_code=422, detail="supported_lang_codes not configured!")
@@ -337,5 +334,5 @@ async def get_content(request: GetContentRequest) -> GetContentResponse:
     content_source_data = content_list[0].get("contentSourceData")[0]
     logger.info({"content_source_data": content_source_data})
 
-    output = GetContentResponse(output=OutputResponse(session_id=current_session_id, audio=content_source_data.get("audioUrl"), text=content_source_data.get("text")))
+    output = GetContentResponse(output=OutputResponse(user_id=user_id, session_id=current_session_id, audio=content_source_data.get("audioUrl"), text=content_source_data.get("text")))
     return output
