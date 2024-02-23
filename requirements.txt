@@ -1,3 +1,4 @@
+requests~=2.31.0
 transformers==4.36.0
 setuptools==65.5.1
 numpy==1.22.2
@@ -12,4 +13,3 @@ pydub==0.25.1
 boto3==1.33.9
 asyncpg==0.27.0
 redis==5.0.1
-requests~=2.31.0
