@@ -11,10 +11,13 @@ from langchain.schema.messages import (
     SystemMessage,
 )
 from langchain.tools import StructuredTool
+import redis
 
+import time
 from io_processing import *
 from logger import logger
 from utils import is_url, is_base64
+import requests
 
 gpt_model = get_config_value("llm", "gpt_model", None)
 
@@ -36,6 +39,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+redis_host = get_config_value('redis', 'redis_host', None)
+redis_port = get_config_value('redis', 'redis_port', None)
+redis_index = get_config_value('redis', 'redis_index', None)
+
+# Connect to Redis
+redis_client = redis.Redis(host=redis_host, port=redis_port, db=redis_index)  # Adjust host and port if needed
+
+
+# Define a function to store and retrieve data in Redis
+def store_data(key, value):
+    redis_client.set(key, value)
+
+
+def retrieve_data(key):
+    data_from_redis = redis_client.get(key)
+    return data_from_redis.decode('utf-8') if data_from_redis is not None else None
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -53,6 +73,8 @@ async def shutdown_event():
 class OutputResponse(BaseModel):
     audio: str = None
     text: str = None
+    session_id: str = None
+
 
 class ResponseForQuery(BaseModel):
     output: OutputResponse
@@ -60,7 +82,6 @@ class ResponseForQuery(BaseModel):
 
 class HealthCheck(BaseModel):
     """Response model to validate and return when performing a health check."""
-
     status: str = "OK"
 
 
@@ -69,6 +90,15 @@ class QueryInputModel(BaseModel):
     language: str = None
     text: str = None
     audio: str = None
+
+
+class GetContentRequest(BaseModel):
+    user_id: str = None
+    language: str = None
+
+
+class GetContentResponse(BaseModel):
+    output: OutputResponse
 
 
 class QueryModel(BaseModel):
@@ -158,13 +188,9 @@ async def query(request: QueryModel, x_request_id: str = Header(None, alias="X-R
     input_text = request.input.text
     session_id = request.input.session_id
 
-    redis_host = get_config_value('redis', 'redis_host', None)
-    redis_port = get_config_value('redis', 'redis_port', None)
-    redis_index = get_config_value('redis', 'redis_index', None)
-
     # setup Redis as a message store
     message_history = RedisChatMessageHistory(
-        url="redis://"+redis_host+":"+redis_port+"/"+redis_index, session_id=session_id
+        url="redis://" + redis_host + ":" + redis_port + "/" + redis_index, session_id=session_id
     )
 
     eng_text = None
@@ -229,3 +255,87 @@ async def query(request: QueryModel, x_request_id: str = Header(None, alias="X-R
 
     response = ResponseForQuery(output=OutputResponse(audio=audio_output_url, text=ai_reg_text))
     return response
+
+
+@app.post("/v1/get_content", include_in_schema=True)
+async def get_content(request: GetContentRequest) -> GetContentResponse:
+    audio_output_url = None
+    ai_reg_text = None
+
+    language_code_list = get_config_value('request', 'supported_lang_codes', None).split(",")
+    if language_code_list is None:
+        raise HTTPException(status_code=422, detail="supported_lang_codes not configured!")
+
+    language = request.language.strip().lower()
+    if language is None or language == "" or language not in language_code_list:
+        raise HTTPException(status_code=422, detail="Unsupported language code entered!")
+
+    user_id = request.user_id
+
+    # api-endpoint
+    get_milestone_url = get_config_value('ALL_APIS', 'get_milestone_api', None)
+
+    # defining a params dict for the parameters to be sent to the API
+    params = {'language': language}
+
+    # sending get request and saving the response as response object
+    milestone_response = requests.get(url=get_milestone_url + user_id, params=params)
+
+    user_milestone_level = milestone_response.json()["data"]["milestone_level"]
+
+    # api-endpoint
+    get_progress_url = get_config_value('ALL_APIS', 'get_user_progress_api', None)
+
+    # defining a params dict for the parameters to be sent to the API
+    params = {'language': language}
+
+    # sending get request and saving the response as response object
+    progress_response = requests.get(url=get_progress_url + user_id, params=params)
+
+    progress_result = progress_response.json()["result"]
+
+    logger.info({"progress_result": progress_result})
+
+    milliseconds = round(time.time() * 1000)
+
+    print("milliseconds:: ", str(milliseconds))
+    current_session_id = str(user_id) + str(milliseconds)
+    print("current_session_id:: ", current_session_id)
+
+    if type(progress_result) is not str:
+        prev_session_id = progress_result["sessionId"]
+
+    get_assessment_api = get_config_value('ALL_APIS', 'get_assessment_api', None)
+    payload = {"tags": ["ASER"], "language": language}
+    headers = {
+        'Content-Type': 'application/json'
+    }
+
+    get_assessment_response = requests.request("POST", get_assessment_api, headers=headers, data=json.dumps(payload))
+
+    logger.info({"get_assessment_response": get_assessment_response})
+
+    assessment_data = get_assessment_response.json()["data"]
+
+    logger.info({"get_assessment_response": get_assessment_response})
+
+    user_assessment_collections: dict = {}
+
+    for collections in assessment_data:
+        if collections["category"] == "Sentence" or collections["category"] == "Word":
+            if user_assessment_collections is None or collections["category"] not in user_assessment_collections.keys():
+                user_assessment_collections[collections["category"]] = collections["content"]
+            elif collections["category"] in user_assessment_collections.keys() and user_milestone_level in collections["tags"]:
+                user_assessment_collections[collections["category"]] = collections["content"]
+
+    logger.info({"user_assessment_collections": json.dumps(user_assessment_collections)})
+    store_data(current_session_id + "_collections_" + user_milestone_level, json.dumps(user_assessment_collections))
+
+    content_list = user_assessment_collections.get("Sentence")
+    logger.info({"content_list": content_list})
+
+    content_source_data = content_list[0].get("contentSourceData")[0]
+    logger.info({"content_source_data": content_source_data})
+
+    output = GetContentResponse(output=OutputResponse(session_id=current_session_id, audio=content_source_data.get("audioUrl"), text=content_source_data.get("text")))
+    return output
