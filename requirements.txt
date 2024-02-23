@@ -1,5 +1,5 @@
 requests
-redis
+redis==4.6.0
 transformers==4.36.0
 setuptools==65.5.1
 numpy==1.22.2
