@@ -343,11 +343,11 @@ async def fetch_content(request: GetContentRequest) -> GetContentResponse:
     output = GetContentResponse(output=OutputResponse(user_id=user_id, session_id=current_session_id, audio=content_source_data.get("audioUrl"), text=content_source_data.get("text")))
     return output
 
-@app.post("/v1/submit_response", include_in_schema=True)
-async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
-
-
-
-    if not is_url(audio_url) and not is_base64(audio_url):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid audio input!")
-    logger.debug("audio_url:: ", audio_url)
+# @app.post("/v1/submit_response", include_in_schema=True)
+# async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
+#
+#
+#
+#     if not is_url(audio_url) and not is_base64(audio_url):
+#         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid audio input!")
+#     logger.debug("audio_url:: ", audio_url)
