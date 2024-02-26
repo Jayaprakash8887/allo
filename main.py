@@ -388,6 +388,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
         else:
             completed_contents = {content_id}
         completed_contents = list(completed_contents)
+        logger.info({"updated_completed_contents": completed_contents})
         store_data(user_id + "_" + user_milestone_level + "_completed_contents", json.dumps(completed_contents))
     else:
         raise HTTPException(500, "Submitted response could not be registered!")
