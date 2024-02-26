@@ -380,7 +380,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     if update_status == "success":
         completed_contents = retrieve_data(user_id + "_" + user_milestone_level + "_completed_contents")
         logger.info({"completed_contents": completed_contents})
-        if completed_contents:
+        if completed_contents and completed_contents != '[null]':
             completed_contents = json.loads(completed_contents)
             if type(completed_contents) == list:
                 completed_contents = set(completed_contents)
