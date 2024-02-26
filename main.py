@@ -324,6 +324,23 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     content_id = request.content_id
     original_text = request.original_text
 
+    language_code_list = get_config_value('request', 'supported_lang_codes', None).split(",")
+    if language_code_list is None:
+        raise HTTPException(status_code=422, detail="supported_lang_codes not configured!")
+
+    language = request.language.strip().lower()
+    if language is None or language == "" or language not in language_code_list:
+        raise HTTPException(status_code=422, detail="Unsupported language code entered!")
+
+    if user_id is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid user_id input!")
+
+    if original_text is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid original_text input!")
+
+    if content_id is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid content_id input!")
+
     if not is_url(audio) and not is_base64(audio):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid audio input!")
     logger.debug("audio:: ", audio)
@@ -380,9 +397,8 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     if update_status == "success":
         completed_contents = retrieve_data(user_id + "_" + user_milestone_level + "_completed_contents")
         logger.info({"completed_contents": completed_contents})
-        if completed_contents and completed_contents != '[null]':
+        if completed_contents:
             completed_contents = json.loads(completed_contents)
-            completed_contents.remove("null")
             if type(completed_contents) == list:
                 completed_contents = set(completed_contents)
             logger.info({"Bef completed_contents": completed_contents})
