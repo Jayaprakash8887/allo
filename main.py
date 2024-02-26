@@ -382,9 +382,13 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
         logger.info({"completed_contents": completed_contents})
         if completed_contents and completed_contents != '[null]':
             completed_contents = json.loads(completed_contents)
+            completed_contents.remove("null")
             if type(completed_contents) == list:
                 completed_contents = set(completed_contents)
+            logger.info({"Bef completed_contents": completed_contents})
+            logger.info({"content_id": content_id})
             completed_contents.add(content_id)
+            logger.info({"Aft completed_contents": completed_contents})
         else:
             completed_contents = {content_id}
         completed_contents = list(completed_contents)
