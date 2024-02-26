@@ -1,3 +1,8 @@
+import secrets
+import string
+from datetime import datetime
+
+import redis
 from dotenv import load_dotenv
 from fastapi import FastAPI, status, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,13 +16,10 @@ from langchain.schema.messages import (
     SystemMessage,
 )
 from langchain.tools import StructuredTool
-import redis
 
-import time
 from io_processing import *
 from logger import logger
 from utils import is_url, is_base64
-import requests
 
 gpt_model = get_config_value("llm", "gpt_model", None)
 
@@ -73,7 +75,7 @@ async def shutdown_event():
 class OutputResponse(BaseModel):
     audio: str = None
     text: str = None
-    session_id: str = None
+    content_id: str = None
 
 
 class ResponseForQuery(BaseModel):
@@ -96,11 +98,13 @@ class GetContentRequest(BaseModel):
     user_id: str = None
     language: str = None
 
+
 class UserAnswerRequest(BaseModel):
     user_id: str = None
-    session_id: str = None
+    content_id: str = None
     audio: str = None
-
+    language: str = None
+    original_text: str = None
 
 
 class GetContentResponse(BaseModel):
@@ -299,55 +303,196 @@ async def fetch_content(request: GetContentRequest) -> GetContentResponse:
 
     logger.info({"progress_result": progress_result})
 
-    milliseconds = round(time.time() * 1000)
-
-    print("milliseconds:: ", str(milliseconds))
-    current_session_id = str(user_id) + str(milliseconds)
-    print("current_session_id:: ", current_session_id)
-
     if type(progress_result) is not str:
         prev_session_id = progress_result["sessionId"]
 
-    get_assessment_api = get_config_value('ALL_APIS', 'get_assessment_api', None)
-    payload = {"tags": ["ASER"], "language": language}
+    milliseconds = round(time.time() * 1000)
+    current_session_id = str(user_id) + str(milliseconds)
+    print("current_session_id:: ", current_session_id)
+    store_data(user_id + "_" + user_milestone_level + "_session", current_session_id)
+
+    output_response = get_next_content(user_milestone_level, user_id, language)
+    content_response = GetContentResponse(output=output_response)
+    return content_response
+
+
+@app.post("/v1/submit_response", include_in_schema=True)
+async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
+    user_id = request.user_id
+    audio = request.audio
+    language = request.language
+    content_id = request.content_id
+    original_text = request.original_text
+
+    if not is_url(audio) and not is_base64(audio):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid audio input!")
+    logger.debug("audio:: ", audio)
+
+    logger.debug("invoking audio url to text conversion")
+    reg_text, eng_text, error_message = process_incoming_voice(audio, language)
+    logger.debug("audio converted:: eng_text:: ", eng_text)
+
+    # api-endpoint
+    get_milestone_url = get_config_value('ALL_APIS', 'get_milestone_api', None)
+
+    # defining a params dict for the parameters to be sent to the API
+    params = {'language': language}
+
+    # sending get request and saving the response as response object
+    milestone_response = requests.get(url=get_milestone_url + user_id, params=params)
+
+    user_milestone_level = milestone_response.json()["data"]["milestone_level"]
+    logger.info({"user_milestone_level": user_milestone_level})
+
+    current_session_id = retrieve_data(user_id + "_" + user_milestone_level + "_session")
+    logger.info({"current_session_id": current_session_id})
+
+    sub_session_id = retrieve_data(user_id + user_milestone_level + "_sub_session")
+    logger.info({"sub_session_id": sub_session_id})
+
+    in_progress_collection_category = retrieve_data(user_id + "_" + user_milestone_level + "_progress_collection_category")
+
+    if in_progress_collection_category is None:
+        in_progress_collection_category = "Sentence"
+
+    # Get the current date
+    current_date = datetime.now().date()
+
+    # Format the date as "YYYY-MM-DD"
+    formatted_date = current_date.strftime("%Y-%m-%d")
+
+    if sub_session_id is None:
+        sub_session_id = generate_sub_session_id()
+        store_data(user_id + user_milestone_level + "_sub_session", sub_session_id)
+
+    update_learner_profile = get_config_value('ALL_APIS', 'update_learner_profile', None) + language
+    payload = {"audio": audio, "contentId": content_id, "contentType": in_progress_collection_category, "date": formatted_date, "language": language, "original_text": original_text, "session_id": current_session_id, "sub_session_id": sub_session_id,
+               "user_id": user_id}
     headers = {
         'Content-Type': 'application/json'
     }
 
-    get_assessment_response = requests.request("POST", get_assessment_api, headers=headers, data=json.dumps(payload))
+    logger.info({"update_learner_profile_payload": payload})
+    update_learner_profile_response = requests.request("POST", update_learner_profile, headers=headers, data=json.dumps(payload))
+    update_status = update_learner_profile_response.json()["status"]
+    logger.info({"update_learner_profile_response": update_learner_profile_response})
 
-    logger.info({"get_assessment_response": get_assessment_response})
+    if update_status == "success":
+        completed_contents = retrieve_data(user_id + "_" + user_milestone_level + "_completed_contents")
+        logger.info({"completed_contents": completed_contents})
+        if completed_contents:
+            completed_contents = json.loads(completed_contents)
+            if type(completed_contents) == list:
+                completed_contents = set(completed_contents)
+            completed_contents.add(content_id)
+        else:
+            completed_contents = {content_id}
+        completed_contents = list(completed_contents)
+        store_data(user_id + "_" + user_milestone_level + "_completed_contents", json.dumps(completed_contents))
+    else:
+        raise HTTPException(500, "Submitted response could not be registered!")
 
-    assessment_data = get_assessment_response.json()["data"]
+    output_response = get_next_content(user_milestone_level, user_id, language)
 
-    logger.info({"get_assessment_response": get_assessment_response})
+    content_response = GetContentResponse(output=output_response)
+    return content_response
+
+
+def generate_sub_session_id(length=24):
+    # Define the set of characters to choose from
+    characters = string.ascii_letters + string.digits
+
+    # Generate a random session ID
+    sub_session_id = ''.join(secrets.choice(characters) for _ in range(length))
+
+    return sub_session_id
+
+
+def get_next_content(user_milestone_level, user_id, language) -> OutputResponse:
+    stored_user_assessment_collections: str = retrieve_data(user_id + "_" + user_milestone_level + "_collections")
 
     user_assessment_collections: dict = {}
+    if stored_user_assessment_collections:
+        user_assessment_collections = json.loads(stored_user_assessment_collections)
 
-    for collections in assessment_data:
-        if collections["category"] == "Sentence" or collections["category"] == "Word":
-            if user_assessment_collections is None or collections["category"] not in user_assessment_collections.keys():
-                user_assessment_collections[collections["category"]] = collections["content"]
-            elif collections["category"] in user_assessment_collections.keys() and user_milestone_level in collections["tags"]:
-                user_assessment_collections[collections["category"]] = collections["content"]
+    logger.info({"Redis user_assessment_collections": user_assessment_collections})
 
-    logger.info({"user_assessment_collections": json.dumps(user_assessment_collections)})
-    store_data(current_session_id + "_collections_" + user_milestone_level, json.dumps(user_assessment_collections))
+    if stored_user_assessment_collections is None:
+        user_assessment_collections: dict = {}
+        get_assessment_api = get_config_value('ALL_APIS', 'get_assessment_api', None)
+        payload = {"tags": ["ASER"], "language": language}
+        headers = {
+            'Content-Type': 'application/json'
+        }
 
-    content_list = user_assessment_collections.get("Sentence")
-    logger.info({"content_list": content_list})
+        get_assessment_response = requests.request("POST", get_assessment_api, headers=headers, data=json.dumps(payload))
 
-    content_source_data = content_list[0].get("contentSourceData")[0]
+        logger.info({"get_assessment_response": get_assessment_response})
+
+        assessment_data = get_assessment_response.json()["data"]
+
+        logger.info({"assessment_data": assessment_data})
+        for collections in assessment_data:
+            if collections["category"] == "Sentence" or collections["category"] == "Word":
+                if user_assessment_collections is None or collections["category"] not in user_assessment_collections.keys():
+                    user_assessment_collections = {collections["category"]: collections}
+                elif collections["category"] in user_assessment_collections.keys() and user_milestone_level in collections["tags"]:
+                    user_assessment_collections[collections["category"]] = collections
+
+        logger.info({"user_assessment_collections": json.dumps(user_assessment_collections)})
+        store_data(user_id + "_" + user_milestone_level + "_collections", json.dumps(user_assessment_collections))
+
+    completed_collections = retrieve_data(user_id + "_" + user_milestone_level + "_completed_collections")
+    in_progress_collection = retrieve_data(user_id + "_" + user_milestone_level + "_progress_collection")
+
+    if completed_collections:
+        completed_collections = json.loads(completed_collections)
+        for completed_collection in completed_collections:
+            user_assessment_collections = {key: val for key, val in user_assessment_collections.items() if val.get("collectionId") != completed_collection}
+    else:
+        completed_collections = []
+
+    current_collection = None
+
+    if in_progress_collection:
+        for collection_value in user_assessment_collections.values():
+            if collection_value.get("collectionId") == in_progress_collection:
+                current_collection = collection_value
+    else:
+        current_collection = list(user_assessment_collections.values())[0]
+        logger.info({"current_collection": current_collection})
+        store_data(user_id + "_" + user_milestone_level + "_progress_collection", current_collection.get("collectionId"))
+        store_data(user_id + "_" + user_milestone_level + "_progress_collection_category", current_collection.get("category"))
+
+    logger.info({"current_collection": current_collection})
+
+    completed_contents = retrieve_data(user_id + "_" + user_milestone_level + "_completed_contents")
+    logger.info({"completed_contents": completed_contents})
+    if completed_contents:
+        completed_contents = json.loads(completed_contents)
+        for content_id in completed_contents:
+            print("\ncontent_id:: ", content_id)
+            for content in current_collection.get("content"):
+                print("\ncontent:: ", content)
+                if content.get("contentId") == content_id:
+                    print("\n MATCH FOUND!! Removing content from collection")
+                    current_collection.get("content").remove(content)
+
+    logger.info({"updated_current_collection": current_collection})
+
+    if "content" in current_collection.keys() and len(current_collection.get("content")) == 0:
+        store_data(user_id + "_" + user_milestone_level + "_completed_collections", completed_collections.append(current_collection.get("collectionId")))
+        user_assessment_collections = {key: val for key, val in user_assessment_collections.items() if val.get("collectionId") != current_collection.get("collectionId")}
+        if len(user_assessment_collections) != 0:
+            current_collection = user_assessment_collections.get(0)
+            logger.info({"current_collection": current_collection})
+            store_data(user_id + "_" + user_milestone_level + "_progress_collection", current_collection.get("collectionId"))
+        else:
+            output = OutputResponse(audio="", text="Congratulations! You have completed the assessment")
+            return output
+
+    content_source_data = current_collection.get("content")[0].get("contentSourceData")[0]
     logger.info({"content_source_data": content_source_data})
 
-    output = GetContentResponse(output=OutputResponse(user_id=user_id, session_id=current_session_id, audio=content_source_data.get("audioUrl"), text=content_source_data.get("text")))
+    output = OutputResponse(audio=content_source_data.get("audioUrl"), text=content_source_data.get("text"), content_id=current_collection.get("content")[0].get("contentId"))
     return output
-
-# @app.post("/v1/submit_response", include_in_schema=True)
-# async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
-#
-#
-#
-#     if not is_url(audio_url) and not is_base64(audio_url):
-#         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid audio input!")
-#     logger.debug("audio_url:: ", audio_url)
