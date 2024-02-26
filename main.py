@@ -390,7 +390,9 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
             completed_contents.add(content_id)
             logger.info({"Aft completed_contents": completed_contents})
         else:
+            logger.info({"content_id": content_id})
             completed_contents = {content_id}
+            logger.info({"ELS completed_contents": completed_contents})
         completed_contents = list(completed_contents)
         logger.info({"updated_completed_contents": completed_contents})
         store_data(user_id + "_" + user_milestone_level + "_completed_contents", json.dumps(completed_contents))
