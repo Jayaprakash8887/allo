@@ -479,11 +479,21 @@ def get_next_content(user_milestone_level, user_id, language, session_id, sub_se
             if collection_value.get("collectionId") == in_progress_collection:
                 logger.debug({"user_id": user_id, "setting_current_collection_using_in_progress_collection": collection_value})
                 current_collection = collection_value
-    else:
+    elif len(user_assessment_collections.values())>0:
         current_collection = list(user_assessment_collections.values())[0]
         logger.debug({"user_id": user_id, "setting_current_collection_using_assessment_collections": current_collection})
         store_data(user_id + "_" + user_milestone_level + "_progress_collection", current_collection.get("collectionId"))
         store_data(user_id + "_" + user_milestone_level + "_progress_collection_category", current_collection.get("category"))
+    else:
+        redis_client.delete(user_id + "_" + user_milestone_level + "_collections")
+        redis_client.delete(user_id + "_" + user_milestone_level + "_completed_collections")
+        redis_client.delete(user_id + "_" + user_milestone_level + "_progress_collection")
+        redis_client.delete(user_id + "_" + user_milestone_level + "_progress_collection_category")
+        redis_client.delete(user_id + "_" + user_milestone_level + "_completed_contents")
+        redis_client.delete(user_id + "_" + user_milestone_level + "_session")
+        redis_client.delete(user_id + "_" + user_milestone_level + "_sub_session")
+
+        output = OutputResponse(audio="", text=f"You have already completed the assessment! Re-login to start fresh!")
 
     logger.info({"user_id": user_id, "current_collection": current_collection})
 
