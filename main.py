@@ -320,7 +320,6 @@ async def fetch_content(request: GetContentRequest) -> GetContentResponse:
 async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     user_id = request.user_id
     audio = request.audio
-    language = request.language
     content_id = request.content_id
     original_text = request.original_text
 
@@ -347,7 +346,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
 
     logger.debug("invoking audio url to text conversion")
     reg_text, eng_text, error_message = process_incoming_voice(audio, language)
-    logger.debug("audio converted:: eng_text:: ", eng_text)
+    logger.info("audio converted:: eng_text:: ", eng_text)
 
     # api-endpoint
     get_milestone_url = get_config_value('ALL_APIS', 'get_milestone_api', None)
@@ -359,13 +358,13 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     milestone_response = requests.get(url=get_milestone_url + user_id, params=params)
 
     user_milestone_level = milestone_response.json()["data"]["milestone_level"]
-    logger.info({"user_milestone_level": user_milestone_level})
+    logger.info({"user_id": user_id, "user_milestone_level": user_milestone_level})
 
     current_session_id = retrieve_data(user_id + "_" + user_milestone_level + "_session")
-    logger.info({"current_session_id": current_session_id})
+    logger.info({"user_id": user_id, "current_session_id": current_session_id})
 
     sub_session_id = retrieve_data(user_id + user_milestone_level + "_sub_session")
-    logger.info({"sub_session_id": sub_session_id})
+    logger.info({"user_id": user_id, "sub_session_id": sub_session_id})
 
     in_progress_collection_category = retrieve_data(user_id + "_" + user_milestone_level + "_progress_collection_category")
 
@@ -383,34 +382,29 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
         store_data(user_id + user_milestone_level + "_sub_session", sub_session_id)
 
     update_learner_profile = get_config_value('ALL_APIS', 'update_learner_profile', None) + language
-    payload = {"audio": audio, "contentId": content_id, "contentType": in_progress_collection_category, "date": formatted_date, "language": language, "original_text": original_text, "session_id": current_session_id, "sub_session_id": sub_session_id,
+    payload = {"contentId": content_id, "contentType": in_progress_collection_category, "date": formatted_date, "language": language, "original_text": original_text, "session_id": current_session_id, "sub_session_id": sub_session_id,
                "user_id": user_id}
     headers = {
         'Content-Type': 'application/json'
     }
 
-    logger.info({"update_learner_profile_payload": payload})
+    logger.debug({"user_id": user_id, "update_learner_profile_payload": payload})
     update_learner_profile_response = requests.request("POST", update_learner_profile, headers=headers, data=json.dumps(payload))
     update_status = update_learner_profile_response.json()["status"]
-    logger.info({"update_learner_profile_response": update_learner_profile_response})
+    logger.debug({"user_id": user_id, "update_learner_profile_response": update_learner_profile_response})
 
     if update_status == "success":
         completed_contents = retrieve_data(user_id + "_" + user_milestone_level + "_completed_contents")
-        logger.info({"completed_contents": completed_contents})
+        logger.debug({"user_id": user_id, "completed_contents": completed_contents})
         if completed_contents:
             completed_contents = json.loads(completed_contents)
             if type(completed_contents) == list:
                 completed_contents = set(completed_contents)
-            logger.info({"Bef completed_contents": completed_contents})
-            logger.info({"content_id": content_id})
             completed_contents.add(content_id)
-            logger.info({"Aft completed_contents": completed_contents})
         else:
-            logger.info({"content_id": content_id})
             completed_contents = {content_id}
-            logger.info({"ELS completed_contents": completed_contents})
         completed_contents = list(completed_contents)
-        logger.info({"updated_completed_contents": completed_contents})
+        logger.debug({"user_id": user_id, "updated_completed_contents": completed_contents})
         store_data(user_id + "_" + user_milestone_level + "_completed_contents", json.dumps(completed_contents))
     else:
         raise HTTPException(500, "Submitted response could not be registered!")
@@ -438,7 +432,7 @@ def get_next_content(user_milestone_level, user_id, language) -> OutputResponse:
     if stored_user_assessment_collections:
         user_assessment_collections = json.loads(stored_user_assessment_collections)
 
-    logger.info({"Redis user_assessment_collections": user_assessment_collections})
+    logger.info({"user_id": user_id, "Redis user_assessment_collections": user_assessment_collections})
 
     if stored_user_assessment_collections is None:
         user_assessment_collections: dict = {}
@@ -449,11 +443,9 @@ def get_next_content(user_milestone_level, user_id, language) -> OutputResponse:
         }
 
         get_assessment_response = requests.request("POST", get_assessment_api, headers=headers, data=json.dumps(payload))
-
         logger.info({"get_assessment_response": get_assessment_response})
 
         assessment_data = get_assessment_response.json()["data"]
-
         logger.info({"assessment_data": assessment_data})
         for collections in assessment_data:
             if collections["category"] == "Sentence" or collections["category"] == "Word":
@@ -487,24 +479,21 @@ def get_next_content(user_milestone_level, user_id, language) -> OutputResponse:
         store_data(user_id + "_" + user_milestone_level + "_progress_collection", current_collection.get("collectionId"))
         store_data(user_id + "_" + user_milestone_level + "_progress_collection_category", current_collection.get("category"))
 
-    logger.info({"current_collection": current_collection})
+    logger.info({"user_id": user_id, "current_collection": current_collection})
 
     completed_contents = retrieve_data(user_id + "_" + user_milestone_level + "_completed_contents")
-    logger.info({"completed_contents": completed_contents})
+    logger.debug({"user_id": user_id, "completed_contents": completed_contents})
     if completed_contents:
         completed_contents = json.loads(completed_contents)
         for content_id in completed_contents:
-            print("\ncontent_id:: ", content_id)
             for content in current_collection.get("content"):
-                print("\ncontent:: ", content)
                 if content.get("contentId") == content_id:
-                    print("\n MATCH FOUND!! Removing content from collection")
                     current_collection.get("content").remove(content)
 
-    logger.info({"updated_current_collection": current_collection})
+    logger.info({"user_id": user_id, "updated_current_collection": current_collection})
 
     if "content" in current_collection.keys() and len(current_collection.get("content")) == 0:
-        store_data(user_id + "_" + user_milestone_level + "_completed_collections", completed_collections.append(current_collection.get("collectionId")))
+        store_data(user_id + "_" + user_milestone_level + "_completed_collections", json.dumps(completed_collections.append(current_collection.get("collectionId"))))
         user_assessment_collections = {key: val for key, val in user_assessment_collections.items() if val.get("collectionId") != current_collection.get("collectionId")}
         if len(user_assessment_collections) != 0:
             current_collection = user_assessment_collections.get(0)
@@ -515,7 +504,7 @@ def get_next_content(user_milestone_level, user_id, language) -> OutputResponse:
             return output
 
     content_source_data = current_collection.get("content")[0].get("contentSourceData")[0]
-    logger.info({"content_source_data": content_source_data})
+    logger.debug({"user_id": user_id, "content_source_data": content_source_data})
 
     output = OutputResponse(audio=content_source_data.get("audioUrl"), text=content_source_data.get("text"), content_id=current_collection.get("content")[0].get("contentId"))
     return output
