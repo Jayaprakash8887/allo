@@ -291,21 +291,21 @@ async def fetch_content(request: GetContentRequest) -> GetContentResponse:
 
     user_milestone_level = milestone_response.json()["data"]["milestone_level"]
 
-    # api-endpoint
-    get_progress_url = get_config_value('ALL_APIS', 'get_user_progress_api', None)
-
-    # defining a params dict for the parameters to be sent to the API
-    params = {'language': language}
-
-    # sending get request and saving the response as response object
-    progress_response = requests.get(url=get_progress_url + user_id, params=params)
-
-    progress_result = progress_response.json()["result"]
-
-    logger.info({"user_id": user_id, "progress_result": progress_result})
-
-    if type(progress_result) is not str:
-        prev_session_id = progress_result["sessionId"]
+    # # api-endpoint
+    # get_progress_url = get_config_value('ALL_APIS', 'get_user_progress_api', None)
+    #
+    # # defining a params dict for the parameters to be sent to the API
+    # params = {'language': language}
+    #
+    # # sending get request and saving the response as response object
+    # progress_response = requests.get(url=get_progress_url + user_id, params=params)
+    #
+    # progress_result = progress_response.json()["result"]
+    #
+    # logger.info({"user_id": user_id, "progress_result": progress_result})
+    #
+    # if type(progress_result) is not str:
+    #     prev_session_id = progress_result["sessionId"]
 
     milliseconds = round(time.time() * 1000)
     current_session_id = str(user_id) + str(milliseconds)
