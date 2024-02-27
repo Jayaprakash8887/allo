@@ -517,11 +517,11 @@ def get_next_content(user_milestone_level, user_id, language, session_id, sub_se
             logger.info({"current_collection": current_collection})
             store_data(user_id + "_" + user_milestone_level + "_progress_collection", current_collection.get("collectionId"))
         else:
-            get_result_api = get_config_value('ALL_APIS', 'get_result_api', None)
-            get_result_payload = {"sub_session_id": sub_session_id, "contentType": current_collection.get("category"), "session_id": session_id, "user_id": user_id, "collectionId": current_collection.get("collectionId"), "language": language}
-            get_result_response = requests.request("POST", get_result_api, headers=headers, data=json.dumps(get_result_payload))
-            logger.info({"user_id": user_id, "get_result_response": get_result_response})
-            percentage = get_result_response.json()["data"]["percentage"]
+            # get_result_api = get_config_value('ALL_APIS', 'get_result_api', None)
+            # get_result_payload = {"sub_session_id": sub_session_id, "contentType": current_collection.get("category"), "session_id": session_id, "user_id": user_id, "collectionId": current_collection.get("collectionId"), "language": language}
+            # get_result_response = requests.request("POST", get_result_api, headers=headers, data=json.dumps(get_result_payload))
+            # logger.info({"user_id": user_id, "get_result_response": get_result_response})
+            # percentage = get_result_response.json()["data"]["percentage"]
 
             redis_client.delete(user_id + "_" + user_milestone_level + "_collections")
             redis_client.delete(user_id + "_" + user_milestone_level + "_completed_collections")
@@ -531,7 +531,7 @@ def get_next_content(user_milestone_level, user_id, language, session_id, sub_se
             redis_client.delete(user_id + "_" + user_milestone_level + "_session")
             redis_client.delete(user_id + "_" + user_milestone_level + "_sub_session")
 
-            output = OutputResponse(audio="", text=f"Congratulations! You have completed the assessment with {percentage} percentage")
+            output = OutputResponse(audio="", text=f"Congratulations! You have completed the assessment!")
             return output
 
     content_source_data = current_collection.get("content")[0].get("contentSourceData")[0]
