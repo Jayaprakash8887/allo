@@ -308,7 +308,7 @@ async def fetch_content(request: GetContentRequest) -> GetContentResponse:
 
     milliseconds = round(time.time() * 1000)
     current_session_id = str(user_id) + str(milliseconds)
-    logger.info("user_id:: ", user_id, " || current_session_id:: ", current_session_id)
+    logger.info({"user_id": user_id, "current_session_id": current_session_id})
     store_data(user_id + "_" + user_milestone_level + "_session", current_session_id)
 
     output_response = get_next_content(user_milestone_level, user_id, language)
@@ -346,7 +346,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
 
     logger.debug("invoking audio url to text conversion")
     reg_text, eng_text, error_message = process_incoming_voice(audio, language)
-    logger.info("user_id:: ", user_id, " || audio converted:: eng_text:: ", eng_text)
+    logger.info({"user_id": user_id, "audio_converted_eng_text:": eng_text})
 
     # api-endpoint
     get_milestone_url = get_config_value('ALL_APIS', 'get_milestone_api', None)
