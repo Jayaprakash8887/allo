@@ -448,12 +448,14 @@ def get_next_content(user_milestone_level, user_id, language) -> OutputResponse:
 
         assessment_data = get_assessment_response.json()["data"]
         logger.info({"user_id": user_id, "assessment_data": assessment_data})
-        for collections in assessment_data:
-            if collections["category"] == "Sentence" or collections["category"] == "Word":
-                if user_assessment_collections is None or collections["category"] not in user_assessment_collections.keys():
-                    user_assessment_collections = {collections["category"]: collections}
-                elif collections["category"] in user_assessment_collections.keys() and user_milestone_level in collections["tags"]:
-                    user_assessment_collections[collections["category"]] = collections
+        for collection in assessment_data:
+            if collection["category"] == "Sentence" or collection["category"] == "Word":
+                if user_assessment_collections is None:
+                    user_assessment_collections = {collection["category"]: collection}
+                elif collection["category"] not in user_assessment_collections.keys():
+                    user_assessment_collections.update({collection["category"]: collection})
+                elif collection["category"] in user_assessment_collections.keys() and user_milestone_level in collection["tags"]:
+                    user_assessment_collections.update({collection["category"]: collection})
 
         logger.info({"user_id": user_id, "user_assessment_collections": json.dumps(user_assessment_collections)})
         store_data(user_id + "_" + user_milestone_level + "_collections", json.dumps(user_assessment_collections))
