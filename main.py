@@ -623,7 +623,7 @@ def get_showcase_content(user_id, language) -> OutputResponse:
             user_showcase_contents = {key: val for key, val in user_showcase_contents.items() if val.get("contentId") != completed_content}
 
     if in_progress_content is None and len(user_showcase_contents) > 0:
-        current_content = list(user_showcase_contents.values())[0]
+        current_content = user_showcase_contents[0]
         logger.info({"user_id": user_id, "setting_current_content_using_showcase_content": current_content})
         store_data(user_id + "_progress_content", current_content.get("contentId"))
     else:
