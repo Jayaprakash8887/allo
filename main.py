@@ -280,6 +280,11 @@ async def fetch_content(request: GetContentRequest) -> GetContentResponse:
 
     user_id = request.user_id
 
+    content_response = func_get_content(user_id, language)
+    return content_response
+
+
+def func_get_content(user_id, language) -> GetContentResponse:
     # api-endpoint
     get_milestone_url = get_config_value('ALL_APIS', 'get_milestone_api', None)
 
@@ -358,8 +363,6 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
 
     mode = get_config_value('request', 'mode', None)
 
-    user_milestone_level = None
-
     if mode == "discovery":
         # api-endpoint
         get_milestone_url = get_config_value('ALL_APIS', 'get_milestone_api', None)
@@ -372,8 +375,6 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
 
         user_milestone_level = milestone_response.json()["data"]["milestone_level"]
         logger.info({"user_id": user_id, "user_milestone_level": user_milestone_level})
-
-    if mode == "discovery":
         current_session_id = retrieve_data(user_id + "_" + language + "_" + user_milestone_level + "_session")
         sub_session_id = retrieve_data(user_id + "_" + language + "_" + user_milestone_level + "_sub_session")
         in_progress_collection_category = retrieve_data(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection_category")
@@ -391,6 +392,9 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
 
     logger.info({"user_id": user_id, "current_session_id": current_session_id})
     logger.info({"user_id": user_id, "sub_session_id": sub_session_id})
+
+    if current_session_id is None:
+        return func_get_content(user_id=user_id, language=language)
 
     # Get the current date
     current_date = datetime.now().date()
