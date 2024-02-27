@@ -516,6 +516,9 @@ def get_next_content(user_milestone_level, user_id, language, session_id, sub_se
         store_data(user_id + "_" + user_milestone_level + "_completed_collections", json.dumps(completed_collections))
         user_assessment_collections = {key: val for key, val in user_assessment_collections.items() if val.get("collectionId") != current_collection.get("collectionId")}
 
+        logger.info({"user_id": user_id, "completed_collection_id": current_collection.get("collectionId"), "after_removin_completed_collection_user_assessment_collections": user_assessment_collections})
+
+
         add_lesson_api = get_config_value('ALL_APIS', 'add_lesson_api', None)
         add_lesson_payload = {"userId": user_id, "sessionId": session_id, "milestone": "discoverylist/discovery/" + current_collection.get("collectionId"), "lesson": current_collection.get("name"), "progress": 100,
                               "milestoneLevel": user_milestone_level, "language": language}
@@ -524,7 +527,7 @@ def get_next_content(user_milestone_level, user_id, language, session_id, sub_se
 
         if len(user_assessment_collections) != 0:
             current_collection = user_assessment_collections.get(0)
-            logger.info({"current_collection": current_collection})
+            logger.info({"user_id": user_id, "current_collection": current_collection})
             store_data(user_id + "_" + user_milestone_level + "_progress_collection", current_collection.get("collectionId"))
         else:
             # get_result_api = get_config_value('ALL_APIS', 'get_result_api', None)
