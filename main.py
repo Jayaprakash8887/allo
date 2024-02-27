@@ -464,8 +464,6 @@ def get_next_content(user_milestone_level, user_id, language) -> OutputResponse:
         completed_collections = json.loads(completed_collections)
         for completed_collection in completed_collections:
             user_assessment_collections = {key: val for key, val in user_assessment_collections.items() if val.get("collectionId") != completed_collection}
-    else:
-        completed_collections = []
 
     current_collection = None
 
@@ -475,7 +473,6 @@ def get_next_content(user_milestone_level, user_id, language) -> OutputResponse:
                 current_collection = collection_value
     else:
         current_collection = list(user_assessment_collections.values())[0]
-        logger.info({"current_collection": current_collection})
         store_data(user_id + "_" + user_milestone_level + "_progress_collection", current_collection.get("collectionId"))
         store_data(user_id + "_" + user_milestone_level + "_progress_collection_category", current_collection.get("category"))
 
@@ -492,8 +489,12 @@ def get_next_content(user_milestone_level, user_id, language) -> OutputResponse:
 
     logger.info({"user_id": user_id, "updated_current_collection": current_collection})
 
-    if "content" in current_collection.keys() and len(current_collection.get("content")) == 0:
-        store_data(user_id + "_" + user_milestone_level + "_completed_collections", json.dumps(completed_collections.append(current_collection.get("collectionId"))))
+    if "content" not in current_collection.keys() or len(current_collection.get("content")) == 0:
+        if completed_collections:
+            completed_collections.append(current_collection.get("collectionId"))
+        else:
+            completed_collections = [current_collection.get("collectionId")]
+        store_data(user_id + "_" + user_milestone_level + "_completed_collections", json.dumps(completed_collections))
         user_assessment_collections = {key: val for key, val in user_assessment_collections.items() if val.get("collectionId") != current_collection.get("collectionId")}
         if len(user_assessment_collections) != 0:
             current_collection = user_assessment_collections.get(0)
