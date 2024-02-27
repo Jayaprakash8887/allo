@@ -328,7 +328,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     if language_code_list is None:
         raise HTTPException(status_code=422, detail="supported_lang_codes not configured!")
 
-    language = request.language.strip().lower()
+    language = request.language
     if language is None or language == "" or language not in language_code_list:
         raise HTTPException(status_code=422, detail="Unsupported language code entered!")
 
