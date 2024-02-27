@@ -590,10 +590,7 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id, s
 
 def get_showcase_content(user_id, language) -> OutputResponse:
     stored_user_showcase_contents: str = retrieve_data(user_id + "_showcase_contents")
-    headers = {
-        'Content-Type': 'application/json'
-    }
-    user_showcase_contents: dict = {}
+    user_showcase_contents = []
     if stored_user_showcase_contents:
         user_showcase_contents = json.loads(stored_user_showcase_contents)
 
@@ -620,7 +617,9 @@ def get_showcase_content(user_id, language) -> OutputResponse:
     if completed_contents:
         completed_contents = json.loads(completed_contents)
         for completed_content in completed_contents:
-            user_showcase_contents = {key: val for key, val in user_showcase_contents.items() if val.get("contentId") != completed_content}
+            for showcase_content in user_showcase_contents:
+                if showcase_content.get("contentId") == completed_content:
+                    user_showcase_contents.remove(showcase_content)
 
     if in_progress_content is None and len(user_showcase_contents) > 0:
         current_content = user_showcase_contents[0]
