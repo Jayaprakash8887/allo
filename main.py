@@ -314,10 +314,10 @@ async def fetch_content(request: GetContentRequest) -> GetContentResponse:
     mode = get_config_value('request', 'mode', None)
 
     if mode == "discovery":
-        store_data(user_id + "_" + user_milestone_level + "_session", current_session_id)
+        store_data(user_id + "_" + language + "_" + user_milestone_level + "_session", current_session_id)
         output_response = get_discovery_content(user_milestone_level, user_id, language, current_session_id, None)
     else:
-        store_data(user_id + "_session", current_session_id)
+        store_data(user_id + "_" + language + "_session", current_session_id)
         output_response = get_showcase_content(user_id, language)
 
     content_response = GetContentResponse(output=output_response)
@@ -374,20 +374,20 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
         logger.info({"user_id": user_id, "user_milestone_level": user_milestone_level})
 
     if mode == "discovery":
-        current_session_id = retrieve_data(user_id + "_" + user_milestone_level + "_session")
-        sub_session_id = retrieve_data(user_id + "_" + user_milestone_level + "_sub_session")
-        in_progress_collection_category = retrieve_data(user_id + "_" + user_milestone_level + "_progress_collection_category")
+        current_session_id = retrieve_data(user_id + "_" + language + "_" + user_milestone_level + "_session")
+        sub_session_id = retrieve_data(user_id + "_" + language + "_" + user_milestone_level + "_sub_session")
+        in_progress_collection_category = retrieve_data(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection_category")
         if in_progress_collection_category is None:
             in_progress_collection_category = "Word"
-            store_data(user_id + "_" + user_milestone_level + "_progress_collection_category", in_progress_collection_category)
+            store_data(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection_category", in_progress_collection_category)
     else:
-        current_session_id = retrieve_data(user_id + "_session")
-        sub_session_id = retrieve_data(user_id + "_sub_session")
+        current_session_id = retrieve_data(user_id + "_" + language + "_session")
+        sub_session_id = retrieve_data(user_id + "_" + language + "_sub_session")
 
-        in_progress_collection_category = retrieve_data(user_id + "_progress_collection_category")
+        in_progress_collection_category = retrieve_data(user_id + "_" + language + "_progress_collection_category")
         if in_progress_collection_category is None:
             in_progress_collection_category = "Word"
-            store_data(user_id + "_progress_collection_category", in_progress_collection_category)
+            store_data(user_id + "_" + language + "_progress_collection_category", in_progress_collection_category)
 
     logger.info({"user_id": user_id, "current_session_id": current_session_id})
     logger.info({"user_id": user_id, "sub_session_id": sub_session_id})
@@ -401,9 +401,9 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     if sub_session_id is None:
         sub_session_id = generate_sub_session_id()
         if mode == "discovery":
-            store_data(user_id + "_" + user_milestone_level + "_sub_session", sub_session_id)
+            store_data(user_id + "_" + language + "_" + user_milestone_level + "_sub_session", sub_session_id)
         else:
-            store_data(user_id + "_sub_session", sub_session_id)
+            store_data(user_id + "_" + language + "_sub_session", sub_session_id)
 
     update_learner_profile = get_config_value('ALL_APIS', 'update_learner_profile', None) + language
     payload = {"audio": audio, "contentId": content_id, "contentType": in_progress_collection_category, "date": formatted_date, "language": language, "original_text": original_text, "session_id": current_session_id, "sub_session_id": sub_session_id,
@@ -419,9 +419,9 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
 
     if update_status == "success":
         if mode == "discovery":
-            completed_contents = retrieve_data(user_id + "_" + user_milestone_level + "_completed_contents")
+            completed_contents = retrieve_data(user_id + "_" + language + "_" + user_milestone_level + "_completed_contents")
         else:
-            completed_contents = retrieve_data(user_id + "_completed_contents")
+            completed_contents = retrieve_data(user_id + "_" + language + "_completed_contents")
         logger.debug({"user_id": user_id, "completed_contents": completed_contents})
         if completed_contents:
             completed_contents = json.loads(completed_contents)
@@ -433,9 +433,9 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
         completed_contents = list(completed_contents)
         logger.debug({"user_id": user_id, "updated_completed_contents": completed_contents})
         if mode == "discovery":
-            store_data(user_id + "_" + user_milestone_level + "_completed_contents", json.dumps(completed_contents))
+            store_data(user_id + "_" + language + "_" + user_milestone_level + "_completed_contents", json.dumps(completed_contents))
         else:
-            store_data(user_id + "_completed_contents", json.dumps(completed_contents))
+            store_data(user_id + "_" + language + "_completed_contents", json.dumps(completed_contents))
     else:
         raise HTTPException(500, "Submitted response could not be registered!")
 
@@ -459,7 +459,7 @@ def generate_sub_session_id(length=24):
 
 
 def get_discovery_content(user_milestone_level, user_id, language, session_id, sub_session_id) -> OutputResponse:
-    stored_user_assessment_collections: str = retrieve_data(user_id + "_" + user_milestone_level + "_collections")
+    stored_user_assessment_collections: str = retrieve_data(user_id + "_" + language + "_" + user_milestone_level + "_collections")
     headers = {
         'Content-Type': 'application/json'
     }
@@ -489,11 +489,11 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id, s
                     user_assessment_collections.update({collection["category"]: collection})
 
         logger.info({"user_id": user_id, "user_assessment_collections": json.dumps(user_assessment_collections)})
-        store_data(user_id + "_" + user_milestone_level + "_collections", json.dumps(user_assessment_collections))
+        store_data(user_id + "_" + language + "_" + user_milestone_level + "_collections", json.dumps(user_assessment_collections))
 
-    completed_collections = retrieve_data(user_id + "_" + user_milestone_level + "_completed_collections")
+    completed_collections = retrieve_data(user_id + "_" + language + "_" + user_milestone_level + "_completed_collections")
     logger.info({"user_id": user_id, "completed_collections": completed_collections})
-    in_progress_collection = retrieve_data(user_id + "_" + user_milestone_level + "_progress_collection")
+    in_progress_collection = retrieve_data(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection")
     logger.info({"user_id": user_id, "in_progress_collection": in_progress_collection})
 
     if completed_collections and in_progress_collection and in_progress_collection in json.loads(completed_collections):
@@ -514,23 +514,23 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id, s
     elif len(user_assessment_collections.values()) > 0:
         current_collection = list(user_assessment_collections.values())[0]
         logger.debug({"user_id": user_id, "setting_current_collection_using_assessment_collections": current_collection})
-        store_data(user_id + "_" + user_milestone_level + "_progress_collection", current_collection.get("collectionId"))
-        store_data(user_id + "_" + user_milestone_level + "_progress_collection_category", current_collection.get("category"))
+        store_data(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection", current_collection.get("collectionId"))
+        store_data(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection_category", current_collection.get("category"))
     else:
-        redis_client.delete(user_id + "_" + user_milestone_level + "_collections")
-        redis_client.delete(user_id + "_" + user_milestone_level + "_completed_collections")
-        redis_client.delete(user_id + "_" + user_milestone_level + "_progress_collection")
-        redis_client.delete(user_id + "_" + user_milestone_level + "_progress_collection_category")
-        redis_client.delete(user_id + "_" + user_milestone_level + "_completed_contents")
-        redis_client.delete(user_id + "_" + user_milestone_level + "_session")
-        redis_client.delete(user_id + "_" + user_milestone_level + "_sub_session")
+        redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_collections")
+        redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_completed_collections")
+        redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection")
+        redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection_category")
+        redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_completed_contents")
+        redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_session")
+        redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_sub_session")
 
         output = OutputResponse(audio="", text=f"You have already completed the assessment! Re-login to start fresh!")
         return output
 
     logger.info({"user_id": user_id, "current_collection": current_collection})
 
-    completed_contents = retrieve_data(user_id + "_" + user_milestone_level + "_completed_contents")
+    completed_contents = retrieve_data(user_id + "_" + language + "_" + user_milestone_level + "_completed_contents")
     logger.debug({"user_id": user_id, "completed_contents": completed_contents})
     if completed_contents:
         completed_contents = json.loads(completed_contents)
@@ -546,7 +546,7 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id, s
             completed_collections.append(current_collection.get("collectionId"))
         else:
             completed_collections = [current_collection.get("collectionId")]
-        store_data(user_id + "_" + user_milestone_level + "_completed_collections", json.dumps(completed_collections))
+        store_data(user_id + "_" + language + "_" + user_milestone_level + "_completed_collections", json.dumps(completed_collections))
         user_assessment_collections = {key: val for key, val in user_assessment_collections.items() if val.get("collectionId") != current_collection.get("collectionId")}
 
         logger.info({"user_id": user_id, "completed_collection_id": current_collection.get("collectionId"), "after_removin_completed_collection_user_assessment_collections": user_assessment_collections})
@@ -560,7 +560,7 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id, s
         if len(user_assessment_collections) != 0:
             current_collection = list(user_assessment_collections.values())[0]
             logger.info({"user_id": user_id, "current_collection": current_collection})
-            store_data(user_id + "_" + user_milestone_level + "_progress_collection", current_collection.get("collectionId"))
+            store_data(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection", current_collection.get("collectionId"))
         else:
             # get_result_api = get_config_value('ALL_APIS', 'get_result_api', None)
             # get_result_payload = {"sub_session_id": sub_session_id, "contentType": current_collection.get("category"), "session_id": session_id, "user_id": user_id, "collectionId": current_collection.get("collectionId"), "language": language}
@@ -568,13 +568,13 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id, s
             # logger.info({"user_id": user_id, "get_result_response": get_result_response})
             # percentage = get_result_response.json()["data"]["percentage"]
 
-            redis_client.delete(user_id + "_" + user_milestone_level + "_collections")
-            redis_client.delete(user_id + "_" + user_milestone_level + "_completed_collections")
-            redis_client.delete(user_id + "_" + user_milestone_level + "_progress_collection")
-            redis_client.delete(user_id + "_" + user_milestone_level + "_progress_collection_category")
-            redis_client.delete(user_id + "_" + user_milestone_level + "_completed_contents")
-            redis_client.delete(user_id + "_" + user_milestone_level + "_session")
-            redis_client.delete(user_id + "_" + user_milestone_level + "_sub_session")
+            redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_collections")
+            redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_completed_collections")
+            redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection")
+            redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection_category")
+            redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_completed_contents")
+            redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_session")
+            redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_sub_session")
 
             output = OutputResponse(audio="", text=f"Congratulations! You have completed the assessment!")
             return output
@@ -589,7 +589,7 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id, s
 
 
 def get_showcase_content(user_id, language) -> OutputResponse:
-    stored_user_showcase_contents: str = retrieve_data(user_id + "_showcase_contents")
+    stored_user_showcase_contents: str = retrieve_data(user_id + "_" + language + "_showcase_contents")
     user_showcase_contents = []
     if stored_user_showcase_contents:
         user_showcase_contents = json.loads(stored_user_showcase_contents)
@@ -604,11 +604,11 @@ def get_showcase_content(user_id, language) -> OutputResponse:
         showcase_contents_response = requests.get(url=get_showcase_contents_api + user_id, params=params)
         user_showcase_contents = showcase_contents_response.json()["content"]
         logger.info({"user_id": user_id, "user_showcase_contents": user_showcase_contents})
-        store_data(user_id + "_showcase_contents", json.dumps(user_showcase_contents))
+        store_data(user_id + "_" + language + "_showcase_contents", json.dumps(user_showcase_contents))
 
-    completed_contents = retrieve_data(user_id + "_completed_contents")
+    completed_contents = retrieve_data(user_id + "_" + language + "_completed_contents")
     logger.info({"user_id": user_id, "completed_contents": completed_contents})
-    in_progress_content = retrieve_data(user_id + "_progress_content")
+    in_progress_content = retrieve_data(user_id + "_" + language + "_progress_content")
     logger.info({"user_id": user_id, "progress_content": in_progress_content})
 
     if completed_contents and in_progress_content and in_progress_content in json.loads(completed_contents):
@@ -624,13 +624,13 @@ def get_showcase_content(user_id, language) -> OutputResponse:
     if in_progress_content is None and len(user_showcase_contents) > 0:
         current_content = user_showcase_contents[0]
         logger.info({"user_id": user_id, "setting_current_content_using_showcase_content": current_content})
-        store_data(user_id + "_progress_content", current_content.get("contentId"))
+        store_data(user_id + "_" + language + "_progress_content", current_content.get("contentId"))
     else:
-        redis_client.delete(user_id + "_contents")
-        redis_client.delete(user_id + "_progress_content")
-        redis_client.delete(user_id + "_completed_contents")
-        redis_client.delete(user_id + "_session")
-        redis_client.delete(user_id + "_sub_session")
+        redis_client.delete(user_id + "_" + language + "_contents")
+        redis_client.delete(user_id + "_" + language + "_progress_content")
+        redis_client.delete(user_id + "_" + language + "_completed_contents")
+        redis_client.delete(user_id + "_" + language + "_session")
+        redis_client.delete(user_id + "_" + language + "_sub_session")
 
         output = OutputResponse(audio="", text=f"You have completed the Showcase! Re-login to start fresh!")
         return output
