@@ -443,10 +443,10 @@ def get_next_content(user_milestone_level, user_id, language) -> OutputResponse:
         }
 
         get_assessment_response = requests.request("POST", get_assessment_api, headers=headers, data=json.dumps(payload))
-        logger.info({"get_assessment_response": get_assessment_response})
+        logger.info({"user_id": user_id, "get_assessment_response": get_assessment_response})
 
         assessment_data = get_assessment_response.json()["data"]
-        logger.info({"assessment_data": assessment_data})
+        logger.info({"user_id": user_id, "assessment_data": assessment_data})
         for collections in assessment_data:
             if collections["category"] == "Sentence" or collections["category"] == "Word":
                 if user_assessment_collections is None or collections["category"] not in user_assessment_collections.keys():
@@ -454,11 +454,13 @@ def get_next_content(user_milestone_level, user_id, language) -> OutputResponse:
                 elif collections["category"] in user_assessment_collections.keys() and user_milestone_level in collections["tags"]:
                     user_assessment_collections[collections["category"]] = collections
 
-        logger.info({"user_assessment_collections": json.dumps(user_assessment_collections)})
+        logger.info({"user_id": user_id, "user_assessment_collections": json.dumps(user_assessment_collections)})
         store_data(user_id + "_" + user_milestone_level + "_collections", json.dumps(user_assessment_collections))
 
     completed_collections = retrieve_data(user_id + "_" + user_milestone_level + "_completed_collections")
+    logger.info({"user_id": user_id, "completed_collections": completed_collections})
     in_progress_collection = retrieve_data(user_id + "_" + user_milestone_level + "_progress_collection")
+    logger.info({"user_id": user_id, "in_progress_collection": in_progress_collection})
 
     if completed_collections:
         completed_collections = json.loads(completed_collections)
@@ -470,9 +472,11 @@ def get_next_content(user_milestone_level, user_id, language) -> OutputResponse:
     if in_progress_collection:
         for collection_value in user_assessment_collections.values():
             if collection_value.get("collectionId") == in_progress_collection:
+                logger.debug({"user_id": user_id, "setting_current_collection_using_in_progress_collection": collection_value})
                 current_collection = collection_value
     else:
         current_collection = list(user_assessment_collections.values())[0]
+        logger.debug({"user_id": user_id, "setting_current_collection_using_assessment_collections": current_collection})
         store_data(user_id + "_" + user_milestone_level + "_progress_collection", current_collection.get("collectionId"))
         store_data(user_id + "_" + user_milestone_level + "_progress_collection_category", current_collection.get("category"))
 
