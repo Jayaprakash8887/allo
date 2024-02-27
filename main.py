@@ -310,9 +310,16 @@ async def fetch_content(request: GetContentRequest) -> GetContentResponse:
     milliseconds = round(time.time() * 1000)
     current_session_id = str(user_id) + str(milliseconds)
     logger.info({"user_id": user_id, "current_session_id": current_session_id})
-    store_data(user_id + "_" + user_milestone_level + "_session", current_session_id)
 
-    output_response = get_next_content(user_milestone_level, user_id, language, current_session_id, None)
+    mode = get_config_value('request', 'mode', None)
+
+    if mode == "discovery":
+        store_data(user_id + "_" + user_milestone_level + "_session", current_session_id)
+        output_response = get_discovery_content(user_milestone_level, user_id, language, current_session_id, None)
+    else:
+        store_data(user_id + "_session", current_session_id)
+        output_response = get_showcase_content(user_id, language)
+
     content_response = GetContentResponse(output=output_response)
     return content_response
 
@@ -349,28 +356,41 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     reg_text, eng_text, error_message = process_incoming_voice(audio, language)
     logger.info({"user_id": user_id, "audio_converted_eng_text:": eng_text})
 
-    # api-endpoint
-    get_milestone_url = get_config_value('ALL_APIS', 'get_milestone_api', None)
+    mode = get_config_value('request', 'mode', None)
 
-    # defining a params dict for the parameters to be sent to the API
-    params = {'language': language}
+    user_milestone_level = None
 
-    # sending get request and saving the response as response object
-    milestone_response = requests.get(url=get_milestone_url + user_id, params=params)
+    if mode == "discovery":
+        # api-endpoint
+        get_milestone_url = get_config_value('ALL_APIS', 'get_milestone_api', None)
 
-    user_milestone_level = milestone_response.json()["data"]["milestone_level"]
-    logger.info({"user_id": user_id, "user_milestone_level": user_milestone_level})
+        # defining a params dict for the parameters to be sent to the API
+        params = {'language': language}
 
-    current_session_id = retrieve_data(user_id + "_" + user_milestone_level + "_session")
+        # sending get request and saving the response as response object
+        milestone_response = requests.get(url=get_milestone_url + user_id, params=params)
+
+        user_milestone_level = milestone_response.json()["data"]["milestone_level"]
+        logger.info({"user_id": user_id, "user_milestone_level": user_milestone_level})
+
+    if mode == "discovery":
+        current_session_id = retrieve_data(user_id + "_" + user_milestone_level + "_session")
+        sub_session_id = retrieve_data(user_id + "_" + user_milestone_level + "_sub_session")
+        in_progress_collection_category = retrieve_data(user_id + "_" + user_milestone_level + "_progress_collection_category")
+        if in_progress_collection_category is None:
+            in_progress_collection_category = "Word"
+            store_data(user_id + "_" + user_milestone_level + "_progress_collection_category", in_progress_collection_category)
+    else:
+        current_session_id = retrieve_data(user_id + "_session")
+        sub_session_id = retrieve_data(user_id + "_sub_session")
+
+        in_progress_collection_category = retrieve_data(user_id + "_progress_collection_category")
+        if in_progress_collection_category is None:
+            in_progress_collection_category = "Word"
+            store_data(user_id + "_progress_collection_category", in_progress_collection_category)
+
     logger.info({"user_id": user_id, "current_session_id": current_session_id})
-
-    sub_session_id = retrieve_data(user_id + "_" + user_milestone_level + "_sub_session")
     logger.info({"user_id": user_id, "sub_session_id": sub_session_id})
-
-    in_progress_collection_category = retrieve_data(user_id + "_" + user_milestone_level + "_progress_collection_category")
-
-    if in_progress_collection_category is None:
-        in_progress_collection_category = "Sentence"
 
     # Get the current date
     current_date = datetime.now().date()
@@ -380,7 +400,10 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
 
     if sub_session_id is None:
         sub_session_id = generate_sub_session_id()
-        store_data(user_id + "_" + user_milestone_level + "_sub_session", sub_session_id)
+        if mode == "discovery":
+            store_data(user_id + "_" + user_milestone_level + "_sub_session", sub_session_id)
+        else:
+            store_data(user_id + "_sub_session", sub_session_id)
 
     update_learner_profile = get_config_value('ALL_APIS', 'update_learner_profile', None) + language
     payload = {"audio": audio, "contentId": content_id, "contentType": in_progress_collection_category, "date": formatted_date, "language": language, "original_text": original_text, "session_id": current_session_id, "sub_session_id": sub_session_id,
@@ -395,7 +418,10 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     logger.debug({"user_id": user_id, "update_learner_profile_response": update_learner_profile_response})
 
     if update_status == "success":
-        completed_contents = retrieve_data(user_id + "_" + user_milestone_level + "_completed_contents")
+        if mode == "discovery":
+            completed_contents = retrieve_data(user_id + "_" + user_milestone_level + "_completed_contents")
+        else:
+            completed_contents = retrieve_data(user_id + "_completed_contents")
         logger.debug({"user_id": user_id, "completed_contents": completed_contents})
         if completed_contents:
             completed_contents = json.loads(completed_contents)
@@ -406,11 +432,17 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
             completed_contents = {content_id}
         completed_contents = list(completed_contents)
         logger.debug({"user_id": user_id, "updated_completed_contents": completed_contents})
-        store_data(user_id + "_" + user_milestone_level + "_completed_contents", json.dumps(completed_contents))
+        if mode == "discovery":
+            store_data(user_id + "_" + user_milestone_level + "_completed_contents", json.dumps(completed_contents))
+        else:
+            store_data(user_id + "_completed_contents", json.dumps(completed_contents))
     else:
         raise HTTPException(500, "Submitted response could not be registered!")
 
-    output_response = get_next_content(user_milestone_level, user_id, language, current_session_id, sub_session_id)
+    if mode == "discovery":
+        output_response = get_discovery_content(user_milestone_level, user_id, language, current_session_id, sub_session_id)
+    else:
+        output_response = get_showcase_content(user_id, language)
 
     content_response = GetContentResponse(output=output_response)
     return content_response
@@ -426,7 +458,7 @@ def generate_sub_session_id(length=24):
     return sub_session_id
 
 
-def get_next_content(user_milestone_level, user_id, language, session_id, sub_session_id) -> OutputResponse:
+def get_discovery_content(user_milestone_level, user_id, language, session_id, sub_session_id) -> OutputResponse:
     stored_user_assessment_collections: str = retrieve_data(user_id + "_" + user_milestone_level + "_collections")
     headers = {
         'Content-Type': 'application/json'
@@ -494,6 +526,7 @@ def get_next_content(user_milestone_level, user_id, language, session_id, sub_se
         redis_client.delete(user_id + "_" + user_milestone_level + "_sub_session")
 
         output = OutputResponse(audio="", text=f"You have already completed the assessment! Re-login to start fresh!")
+        return output
 
     logger.info({"user_id": user_id, "current_collection": current_collection})
 
@@ -549,7 +582,64 @@ def get_next_content(user_milestone_level, user_id, language, session_id, sub_se
     content_source_data = current_collection.get("content")[0].get("contentSourceData")[0]
     logger.debug({"user_id": user_id, "content_source_data": content_source_data})
     content_id = current_collection.get("content")[0].get("contentId")
-    audioUrl = "https://all-dev-content-service.s3.ap-south-1.amazonaws.com/Audio/" + content_id + ".wav"
+    audio_url = "https://all-dev-content-service.s3.ap-south-1.amazonaws.com/Audio/" + content_id + ".wav"
 
-    output = OutputResponse(audio=audioUrl, text=content_source_data.get("text"), content_id=content_id)
+    output = OutputResponse(audio=audio_url, text=content_source_data.get("text"), content_id=content_id)
+    return output
+
+
+def get_showcase_content(user_id, language) -> OutputResponse:
+    stored_user_showcase_contents: str = retrieve_data(user_id + "_showcase_contents")
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    user_showcase_contents: dict = {}
+    if stored_user_showcase_contents:
+        user_showcase_contents = json.loads(stored_user_showcase_contents)
+
+    logger.info({"user_id": user_id, "Redis stored_user_showcase_contents": stored_user_showcase_contents})
+
+    if stored_user_showcase_contents is None:
+        get_showcase_contents_api = get_config_value('ALL_APIS', 'get_showcase_contents_api', None) + user_id
+        # defining a params dict for the parameters to be sent to the API
+        params = {'language': language, 'contentlimit': 10, 'gettargetlimit': 10}
+        # sending get request and saving the response as response object
+        showcase_contents_response = requests.get(url=get_showcase_contents_api + user_id, params=params)
+        user_showcase_contents = showcase_contents_response.json()["content"]
+        logger.info({"user_id": user_id, "user_showcase_contents": user_showcase_contents})
+        store_data(user_id + "_showcase_contents", json.dumps(user_showcase_contents))
+
+    completed_contents = retrieve_data(user_id + "_completed_contents")
+    logger.info({"user_id": user_id, "completed_contents": completed_contents})
+    in_progress_content = retrieve_data(user_id + "_progress_content")
+    logger.info({"user_id": user_id, "progress_content": in_progress_content})
+
+    if completed_contents and in_progress_content and in_progress_content in json.loads(completed_contents):
+        in_progress_content = None
+
+    if completed_contents:
+        completed_contents = json.loads(completed_contents)
+        for completed_content in completed_contents:
+            user_showcase_contents = {key: val for key, val in user_showcase_contents.items() if val.get("contentId") != completed_content}
+
+    if in_progress_content is None and len(user_showcase_contents) > 0:
+        current_content = list(user_showcase_contents.values())[0]
+        logger.info({"user_id": user_id, "setting_current_content_using_showcase_content": current_content})
+        store_data(user_id + "_progress_content", current_content.get("contentId"))
+    else:
+        redis_client.delete(user_id + "_contents")
+        redis_client.delete(user_id + "_progress_content")
+        redis_client.delete(user_id + "_completed_contents")
+        redis_client.delete(user_id + "_session")
+        redis_client.delete(user_id + "_sub_session")
+
+        output = OutputResponse(audio="", text=f"You have completed the Showcase! Re-login to start fresh!")
+        return output
+
+    content_source_data = current_content.get("contentSourceData")[0]
+    logger.debug({"user_id": user_id, "content_source_data": content_source_data})
+    content_id = current_content.get("contentId")
+    audio_url = "https://all-dev-content-service.s3.ap-south-1.amazonaws.com/Audio/" + content_id + ".wav"
+
+    output = OutputResponse(audio=audio_url, text=content_source_data.get("text"), content_id=content_id)
     return output
