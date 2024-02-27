@@ -362,7 +362,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     logger.info({"user_id": user_id, "audio_converted_eng_text:": eng_text})
 
     mode = get_config_value('request', 'mode', None)
-
+    user_milestone_level = None
     if mode == "discovery":
         # api-endpoint
         get_milestone_url = get_config_value('ALL_APIS', 'get_milestone_api', None)
@@ -593,6 +593,7 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id, s
 
 
 def get_showcase_content(user_id, language) -> OutputResponse:
+    current_content = None
     stored_user_showcase_contents: str = retrieve_data(user_id + "_" + language + "_showcase_contents")
     user_showcase_contents = []
     if stored_user_showcase_contents:
