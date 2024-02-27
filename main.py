@@ -312,7 +312,7 @@ async def fetch_content(request: GetContentRequest) -> GetContentResponse:
     logger.info({"user_id": user_id, "current_session_id": current_session_id})
     store_data(user_id + "_" + user_milestone_level + "_session", current_session_id)
 
-    output_response = get_next_content(user_milestone_level, user_id, language)
+    output_response = get_next_content(user_milestone_level, user_id, language, current_session_id, None)
     content_response = GetContentResponse(output=output_response)
     return content_response
 
@@ -364,7 +364,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     current_session_id = retrieve_data(user_id + "_" + user_milestone_level + "_session")
     logger.info({"user_id": user_id, "current_session_id": current_session_id})
 
-    sub_session_id = retrieve_data(user_id + user_milestone_level + "_sub_session")
+    sub_session_id = retrieve_data(user_id + "_" + user_milestone_level + "_sub_session")
     logger.info({"user_id": user_id, "sub_session_id": sub_session_id})
 
     in_progress_collection_category = retrieve_data(user_id + "_" + user_milestone_level + "_progress_collection_category")
@@ -380,7 +380,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
 
     if sub_session_id is None:
         sub_session_id = generate_sub_session_id()
-        store_data(user_id + user_milestone_level + "_sub_session", sub_session_id)
+        store_data(user_id + "_" + user_milestone_level + "_sub_session", sub_session_id)
 
     update_learner_profile = get_config_value('ALL_APIS', 'update_learner_profile', None) + language
     payload = {"audio": audio, "contentId": content_id, "contentType": in_progress_collection_category, "date": formatted_date, "language": language, "original_text": original_text, "session_id": current_session_id, "sub_session_id": sub_session_id,
@@ -410,7 +410,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     else:
         raise HTTPException(500, "Submitted response could not be registered!")
 
-    output_response = get_next_content(user_milestone_level, user_id, language)
+    output_response = get_next_content(user_milestone_level, user_id, language, current_session_id, sub_session_id)
 
     content_response = GetContentResponse(output=output_response)
     return content_response
@@ -426,9 +426,11 @@ def generate_sub_session_id(length=24):
     return sub_session_id
 
 
-def get_next_content(user_milestone_level, user_id, language) -> OutputResponse:
+def get_next_content(user_milestone_level, user_id, language, session_id, sub_session_id) -> OutputResponse:
     stored_user_assessment_collections: str = retrieve_data(user_id + "_" + user_milestone_level + "_collections")
-
+    headers = {
+        'Content-Type': 'application/json'
+    }
     user_assessment_collections: dict = {}
     if stored_user_assessment_collections:
         user_assessment_collections = json.loads(stored_user_assessment_collections)
@@ -439,9 +441,6 @@ def get_next_content(user_milestone_level, user_id, language) -> OutputResponse:
         user_assessment_collections: dict = {}
         get_assessment_api = get_config_value('ALL_APIS', 'get_assessment_api', None)
         payload = {"tags": ["ASER"], "language": language}
-        headers = {
-            'Content-Type': 'application/json'
-        }
 
         get_assessment_response = requests.request("POST", get_assessment_api, headers=headers, data=json.dumps(payload))
         logger.info({"user_id": user_id, "get_assessment_response": get_assessment_response})
@@ -506,12 +505,33 @@ def get_next_content(user_milestone_level, user_id, language) -> OutputResponse:
             completed_collections = [current_collection.get("collectionId")]
         store_data(user_id + "_" + user_milestone_level + "_completed_collections", json.dumps(completed_collections))
         user_assessment_collections = {key: val for key, val in user_assessment_collections.items() if val.get("collectionId") != current_collection.get("collectionId")}
+
+        add_lesson_api = get_config_value('ALL_APIS', 'add_lesson_api', None)
+        add_lesson_payload = {"userId": user_id, "sessionId": session_id, "milestone": "discoverylist/discovery/" + current_collection.get("collectionId"), "lesson": current_collection.get("name"), "progress": 100,
+                              "milestoneLevel": user_milestone_level, "language": language}
+        add_lesson_response = requests.request("POST", add_lesson_api, headers=headers, data=json.dumps(add_lesson_payload))
+        logger.info({"user_id": user_id, "add_lesson_response": add_lesson_response})
+
         if len(user_assessment_collections) != 0:
             current_collection = user_assessment_collections.get(0)
             logger.info({"current_collection": current_collection})
             store_data(user_id + "_" + user_milestone_level + "_progress_collection", current_collection.get("collectionId"))
         else:
-            output = OutputResponse(audio="", text="Congratulations! You have completed the assessment")
+            get_result_api = get_config_value('ALL_APIS', 'get_result_api', None)
+            get_result_payload = {"sub_session_id": sub_session_id, "contentType": current_collection.get("category"), "session_id": session_id, "user_id": user_id, "collectionId": current_collection.get("collectionId"), "language": language}
+            get_result_response = requests.request("POST", get_result_api, headers=headers, data=json.dumps(get_result_payload))
+            logger.info({"user_id": user_id, "get_result_response": get_result_response})
+            percentage = get_result_response.json()["data"]["percentage"]
+
+            redis_client.delete(user_id + "_" + user_milestone_level + "_collections")
+            redis_client.delete(user_id + "_" + user_milestone_level + "_completed_collections")
+            redis_client.delete(user_id + "_" + user_milestone_level + "_progress_collection")
+            redis_client.delete(user_id + "_" + user_milestone_level + "_progress_collection_category")
+            redis_client.delete(user_id + "_" + user_milestone_level + "_completed_contents")
+            redis_client.delete(user_id + "_" + user_milestone_level + "_session")
+            redis_client.delete(user_id + "_" + user_milestone_level + "_sub_session")
+
+            output = OutputResponse(audio="", text=f"Congratulations! You have completed the assessment with {percentage} percentage")
             return output
 
     content_source_data = current_collection.get("content")[0].get("contentSourceData")[0]
