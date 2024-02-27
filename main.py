@@ -548,6 +548,8 @@ def get_next_content(user_milestone_level, user_id, language, session_id, sub_se
 
     content_source_data = current_collection.get("content")[0].get("contentSourceData")[0]
     logger.debug({"user_id": user_id, "content_source_data": content_source_data})
+    content_id = current_collection.get("content")[0].get("contentId")
+    audioUrl = "https://all-dev-content-service.s3.ap-south-1.amazonaws.com/Audio/" + content_id + ".wav"
 
-    output = OutputResponse(audio=content_source_data.get("audioUrl"), text=content_source_data.get("text"), content_id=current_collection.get("content")[0].get("contentId"))
+    output = OutputResponse(audio=audioUrl, text=content_source_data.get("text"), content_id=content_id)
     return output
