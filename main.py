@@ -382,7 +382,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
         store_data(user_id + user_milestone_level + "_sub_session", sub_session_id)
 
     update_learner_profile = get_config_value('ALL_APIS', 'update_learner_profile', None) + language
-    payload = {"contentId": content_id, "contentType": in_progress_collection_category, "date": formatted_date, "language": language, "original_text": original_text, "session_id": current_session_id, "sub_session_id": sub_session_id,
+    payload = {"audio": audio, "contentId": content_id, "contentType": in_progress_collection_category, "date": formatted_date, "language": language, "original_text": original_text, "session_id": current_session_id, "sub_session_id": sub_session_id,
                "user_id": user_id}
     headers = {
         'Content-Type': 'application/json'
