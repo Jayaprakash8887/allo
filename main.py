@@ -463,7 +463,7 @@ def get_next_content(user_milestone_level, user_id, language) -> OutputResponse:
     in_progress_collection = retrieve_data(user_id + "_" + user_milestone_level + "_progress_collection")
     logger.info({"user_id": user_id, "in_progress_collection": in_progress_collection})
 
-    if in_progress_collection in json.loads(completed_collections):
+    if completed_collections and in_progress_collection and in_progress_collection in json.loads(completed_collections):
         in_progress_collection = None
 
     if completed_collections:
