@@ -1,3 +1,4 @@
+import json
 import secrets
 import string
 from datetime import datetime
@@ -461,6 +462,9 @@ def get_next_content(user_milestone_level, user_id, language) -> OutputResponse:
     logger.info({"user_id": user_id, "completed_collections": completed_collections})
     in_progress_collection = retrieve_data(user_id + "_" + user_milestone_level + "_progress_collection")
     logger.info({"user_id": user_id, "in_progress_collection": in_progress_collection})
+
+    if in_progress_collection in json.loads(completed_collections):
+        in_progress_collection = None
 
     if completed_collections:
         completed_collections = json.loads(completed_collections)
