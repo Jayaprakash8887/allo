@@ -621,12 +621,10 @@ def get_showcase_content(user_id, language) -> OutputResponse:
                 if showcase_content.get("contentId") == completed_content:
                     user_showcase_contents.remove(showcase_content)
 
-    current_content = None
-
     if in_progress_content is None and len(user_showcase_contents) > 0:
         current_content = user_showcase_contents[0]
         store_data(user_id + "_" + language + "_progress_content", current_content.get("contentId"))
-    elif in_progress_content:
+    elif in_progress_content is not None and len(user_showcase_contents) > 0:
         for showcase_content in user_showcase_contents:
             if showcase_content.get("contentId") == in_progress_content:
                 current_content = showcase_content
