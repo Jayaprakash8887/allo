@@ -621,10 +621,15 @@ def get_showcase_content(user_id, language) -> OutputResponse:
                 if showcase_content.get("contentId") == completed_content:
                     user_showcase_contents.remove(showcase_content)
 
+    current_content = None
+
     if in_progress_content is None and len(user_showcase_contents) > 0:
         current_content = user_showcase_contents[0]
-        logger.info({"user_id": user_id, "setting_current_content_using_showcase_content": current_content})
         store_data(user_id + "_" + language + "_progress_content", current_content.get("contentId"))
+    elif in_progress_content:
+        for showcase_content in user_showcase_contents:
+            if showcase_content.get("contentId") == in_progress_content:
+                current_content = showcase_content
     else:
         redis_client.delete(user_id + "_" + language + "_contents")
         redis_client.delete(user_id + "_" + language + "_progress_content")
@@ -635,6 +640,7 @@ def get_showcase_content(user_id, language) -> OutputResponse:
         output = OutputResponse(audio="", text=f"You have completed the Showcase! Re-login to start fresh!")
         return output
 
+    logger.info({"user_id": user_id, "current_content": current_content})
     content_source_data = current_content.get("contentSourceData")[0]
     logger.debug({"user_id": user_id, "content_source_data": content_source_data})
     content_id = current_content.get("contentId")
