@@ -673,7 +673,9 @@ def get_showcase_content(user_id, language) -> OutputResponse:
         current_content = user_showcase_contents[0]
         store_data(user_id + "_" + language + "_progress_content", current_content.get("contentId"))
     elif in_progress_content is not None and len(user_showcase_contents) > 0:
-        current_content = {showcase_content for showcase_content in user_showcase_contents if showcase_content.get("contentId") == in_progress_content}
+        for showcase_content in user_showcase_contents:
+            if showcase_content.get("contentId") == in_progress_content:
+                current_content = showcase_content
     else:
         redis_client.delete(user_id + "_" + language + "_contents")
         redis_client.delete(user_id + "_" + language + "_progress_content")
