@@ -473,7 +473,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
         match language:
             case "kn":
                 conversation_text = "ಉತ್ತಮ ಪ್ರಯತ್ನ! ಮುಂದಿನ ಪದ ಇಲ್ಲಿದೆ: "
-                conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-063129.mp3"
+                conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-112329.mp3"
             case _:
                 conversation_text = "Well tried! Here is the next word:"
                 conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-062956.mp3"
