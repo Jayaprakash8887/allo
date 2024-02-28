@@ -79,8 +79,13 @@ class OutputResponse(BaseModel):
     content_id: str = None
 
 
+class ConversationResponse(BaseModel):
+    audio: str = None
+    text: str = None
+
+
 class ResponseForQuery(BaseModel):
-    output: OutputResponse
+    output: ConversationResponse
 
 
 class HealthCheck(BaseModel):
@@ -109,7 +114,8 @@ class UserAnswerRequest(BaseModel):
 
 
 class GetContentResponse(BaseModel):
-    output: OutputResponse
+    conversation: ConversationResponse
+    content: OutputResponse
 
 
 class QueryModel(BaseModel):
@@ -325,7 +331,17 @@ def func_get_content(user_id, language) -> GetContentResponse:
         store_data(user_id + "_" + language + "_session", current_session_id)
         output_response = get_showcase_content(user_id, language)
 
-    content_response = GetContentResponse(output=output_response)
+    match language:
+        case "kn":
+            conversation_text = "ನಿಮಗೆ ಸ್ವಾಗತ! ನೀವು ಪ್ರಯತ್ನಿಸಬೇಕಾದ ಪದ ಇಲ್ಲಿದೆ: "
+            conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-070142.mp3"
+        case _:
+            conversation_text = "Welcome! Here is the word to try:"
+            conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-065640.mp3"
+
+    conversation_response = ConversationResponse(audio=conversation_audio, text=conversation_text)
+
+    content_response = GetContentResponse(conversation=conversation_response, content=output_response)
     return content_response
 
 
@@ -448,7 +464,32 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     else:
         output_response = get_showcase_content(user_id, language)
 
-    content_response = GetContentResponse(output=output_response)
+    conversation_text = None
+    conversation_audio = None
+
+    if output_response.json()["audio"] != "completed":
+        match language:
+            case "kn":
+                conversation_text = "ಉತ್ತಮ ಪ್ರಯತ್ನ! ಮುಂದಿನ ಪದ ಇಲ್ಲಿದೆ: "
+                conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-063129.mp3"
+            case _:
+                conversation_text = "Well tried! Here is the next word:"
+                conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-062956.mp3"
+    else:
+        match language:
+            case "kn":
+                conversation_text = "ನೀವು ಮೌಲ್ಯಮಾಪನವನ್ನು ಪೂರ್ಣಗೊಳಿಸಿದ್ದೀರಿ! ಹೊಸದಾಗಿ ಪ್ರಾರಂಭಿಸಲು ಮರು-ಲಾಗಿನ್ ಮಾಡಿ."
+                conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-064932.mp3"
+            case _:
+                conversation_text = "You have completed the assessment! Re-login to start fresh."
+                conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-065008.mp3"
+
+    conversation_response = ConversationResponse(audio=conversation_audio, text=conversation_text)
+
+    if output_response.json()["audio"] != "completed":
+        content_response = GetContentResponse(conversation=conversation_response, content=output_response)
+    else:
+        content_response = GetContentResponse(conversation=conversation_response, content=None)
     return content_response
 
 
@@ -529,7 +570,7 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id, s
         redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_session")
         redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_sub_session")
 
-        output = OutputResponse(audio="", text=f"You have already completed the assessment! Re-login to start fresh!")
+        output = OutputResponse(audio="completed", text="completed")
         return output
 
     logger.info({"user_id": user_id, "current_collection": current_collection})
@@ -553,7 +594,7 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id, s
         store_data(user_id + "_" + language + "_" + user_milestone_level + "_completed_collections", json.dumps(completed_collections))
         user_assessment_collections = {key: val for key, val in user_assessment_collections.items() if val.get("collectionId") != current_collection.get("collectionId")}
 
-        logger.info({"user_id": user_id, "completed_collection_id": current_collection.get("collectionId"), "after_removin_completed_collection_user_assessment_collections": user_assessment_collections})
+        logger.info({"user_id": user_id, "completed_collection_id": current_collection.get("collectionId"), "after_removing_completed_collection_user_assessment_collections": user_assessment_collections})
 
         add_lesson_api = get_config_value('ALL_APIS', 'add_lesson_api', None)
         add_lesson_payload = {"userId": user_id, "sessionId": session_id, "milestone": "discoverylist/discovery/" + current_collection.get("collectionId"), "lesson": current_collection.get("name"), "progress": 100,
@@ -580,7 +621,7 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id, s
             redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_session")
             redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_sub_session")
 
-            output = OutputResponse(audio="", text=f"Congratulations! You have completed the assessment!")
+            output = OutputResponse(audio="Completed", text="Completed")
             return output
 
     content_source_data = current_collection.get("content")[0].get("contentSourceData")[0]
@@ -640,7 +681,7 @@ def get_showcase_content(user_id, language) -> OutputResponse:
         redis_client.delete(user_id + "_" + language + "_session")
         redis_client.delete(user_id + "_" + language + "_sub_session")
 
-        output = OutputResponse(audio="", text=f"You have completed the Showcase! Re-login to start fresh!")
+        output = OutputResponse(audio="Completed", text="Completed")
         return output
 
     logger.info({"user_id": user_id, "current_content": current_content})
