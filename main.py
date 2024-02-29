@@ -2,6 +2,7 @@ import json
 import secrets
 import string
 from datetime import datetime
+from typing import Optional
 
 import redis
 from dotenv import load_dotenv
@@ -94,7 +95,7 @@ class HealthCheck(BaseModel):
 
 
 class QueryInputModel(BaseModel):
-    session_id: str = None
+    user_id: str = None
     language: str = None
     text: str = None
     audio: str = None
@@ -114,12 +115,8 @@ class UserAnswerRequest(BaseModel):
 
 
 class GetContentResponse(BaseModel):
-    conversation: ConversationResponse
-    content: OutputResponse
-
-
-class QueryModel(BaseModel):
-    input: QueryInputModel
+    conversation: Optional[ConversationResponse]
+    content: Optional[OutputResponse]
 
 
 class TranscribeInput(BaseModel):
@@ -190,24 +187,32 @@ llm = ChatOpenAI(model=gpt_model, temperature=0)
 
 
 @app.post("/v1/learn_language", include_in_schema=True)
-async def query(request: QueryModel, x_request_id: str = Header(None, alias="X-Request-ID")) -> ResponseForQuery:
+async def query(request: QueryInputModel, x_request_id: str = Header(None, alias="X-Request-ID")) -> GetContentResponse:
     load_dotenv()
 
     language_code_list = get_config_value('request', 'supported_lang_codes', None).split(",")
     if language_code_list is None:
         raise HTTPException(status_code=422, detail="supported_lang_codes not configured!")
 
-    language = request.input.language.strip().lower()
+    language = request.language.strip().lower()
     if language is None or language == "" or language not in language_code_list:
         raise HTTPException(status_code=422, detail="Unsupported language code entered!")
 
-    audio_url = request.input.audio
-    input_text = request.input.text
-    session_id = request.input.session_id
+    audio_url = request.audio
+    input_text = request.text
+    user_id = request.user_id
+
+    current_session_id = retrieve_data(user_id + "_" + language + "_session")
+
+    if current_session_id is None:
+        milliseconds = round(time.time() * 1000)
+        current_session_id = str(user_id) + str(milliseconds)
+        store_data(user_id + "_" + language + "_session", current_session_id)
+    logger.info({"user_id": user_id, "current_session_id": current_session_id})
 
     # setup Redis as a message store
     message_history = RedisChatMessageHistory(
-        url="redis://" + redis_host + ":" + redis_port + "/" + redis_index, session_id=session_id
+        url="redis://" + redis_host + ":" + redis_port + "/" + redis_index, session_id=current_session_id
     )
 
     eng_text = None
@@ -270,8 +275,16 @@ async def query(request: QueryModel, x_request_id: str = Header(None, alias="X-R
     if ai_assistant.startswith("Goodbye") and ai_assistant.endswith("See you soon!"):
         message_history.clear()
 
-    response = ResponseForQuery(output=OutputResponse(audio=audio_output_url, text=ai_reg_text))
-    return response
+    if ai_assistant == "user_agreed":
+        content_response = func_get_content(user_id, language)
+    else:
+        conversation_text = ai_reg_text
+        conversation_audio = audio_output_url
+        conversation_response = ConversationResponse(audio=conversation_audio, text=conversation_text)
+        content_response = GetContentResponse(conversation=conversation_response)
+
+    logger.info({"content_response": content_response})
+    return content_response
 
 
 @app.post("/v1/get_content", include_in_schema=True)
@@ -318,15 +331,17 @@ def func_get_content(user_id, language) -> GetContentResponse:
     # if type(progress_result) is not str:
     #     prev_session_id = progress_result["sessionId"]
 
-    milliseconds = round(time.time() * 1000)
-    current_session_id = str(user_id) + str(milliseconds)
-    logger.info({"user_id": user_id, "current_session_id": current_session_id})
-
     mode = get_config_value('request', 'mode', None)
+    current_session_id = retrieve_data(user_id + "_" + language + "_session")
+
+    if current_session_id is None:
+        milliseconds = round(time.time() * 1000)
+        current_session_id = str(user_id) + str(milliseconds)
+    logger.info({"user_id": user_id, "current_session_id": current_session_id})
 
     if mode == "discovery":
         store_data(user_id + "_" + language + "_" + user_milestone_level + "_session", current_session_id)
-        output_response = get_discovery_content(user_milestone_level, user_id, language, current_session_id, None)
+        output_response = get_discovery_content(user_milestone_level, user_id, language, current_session_id)
     else:
         store_data(user_id + "_" + language + "_session", current_session_id)
         output_response = get_showcase_content(user_id, language)
@@ -505,7 +520,7 @@ def generate_sub_session_id(length=24):
     return sub_session_id
 
 
-def get_discovery_content(user_milestone_level, user_id, language, session_id, sub_session_id) -> OutputResponse:
+def get_discovery_content(user_milestone_level, user_id, language, session_id) -> OutputResponse:
     stored_user_assessment_collections: str = retrieve_data(user_id + "_" + language + "_" + user_milestone_level + "_collections")
     headers = {
         'Content-Type': 'application/json'
