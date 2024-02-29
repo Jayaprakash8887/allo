@@ -298,8 +298,9 @@ async def fetch_content(request: GetContentRequest) -> GetContentResponse:
         raise HTTPException(status_code=422, detail="Unsupported language code entered!")
 
     user_id = request.user_id
+    learning_language = get_config_value('request', 'learn_language', None)
 
-    content_response = func_get_content(user_id, language)
+    content_response = func_get_content(user_id, learning_language)
     return content_response
 
 
@@ -388,6 +389,8 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid audio input!")
     logger.debug("audio:: ", audio)
 
+    learning_language = get_config_value('request', 'learn_language', None)
+
     logger.debug("invoking audio url to text conversion")
     reg_text, eng_text, error_message = process_incoming_voice(audio, language)
     logger.info({"user_id": user_id, "audio_converted_eng_text:": eng_text})
@@ -399,7 +402,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
         get_milestone_url = get_config_value('ALL_APIS', 'get_milestone_api', None)
 
         # defining a params dict for the parameters to be sent to the API
-        params = {'language': language}
+        params = {'language': learning_language}
 
         # sending get request and saving the response as response object
         milestone_response = requests.get(url=get_milestone_url + user_id, params=params)
@@ -425,7 +428,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     logger.info({"user_id": user_id, "sub_session_id": sub_session_id})
 
     if current_session_id is None:
-        return func_get_content(user_id=user_id, language=language)
+        return func_get_content(user_id=user_id, language=learning_language)
 
     # Get the current date
     current_date = datetime.now().date()
@@ -441,7 +444,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
             store_data(user_id + "_" + language + "_sub_session", sub_session_id)
 
     update_learner_profile = get_config_value('ALL_APIS', 'update_learner_profile', None) + language
-    payload = {"audio": audio, "contentId": content_id, "contentType": in_progress_collection_category, "date": formatted_date, "language": language, "original_text": original_text, "session_id": current_session_id, "sub_session_id": sub_session_id,
+    payload = {"audio": audio, "contentId": content_id, "contentType": in_progress_collection_category, "date": formatted_date, "language": learning_language, "original_text": original_text, "session_id": current_session_id, "sub_session_id": sub_session_id,
                "user_id": user_id}
     headers = {
         'Content-Type': 'application/json'
@@ -531,10 +534,12 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id) -
 
     logger.info({"user_id": user_id, "Redis user_assessment_collections": user_assessment_collections})
 
+    learning_language = get_config_value('request', 'learn_language', None)
+
     if stored_user_assessment_collections is None:
         user_assessment_collections: dict = {}
         get_assessment_api = get_config_value('ALL_APIS', 'get_assessment_api', None)
-        payload = {"tags": ["ASER"], "language": language}
+        payload = {"tags": ["ASER"], "language": learning_language}
 
         get_assessment_response = requests.request("POST", get_assessment_api, headers=headers, data=json.dumps(payload))
         logger.info({"user_id": user_id, "get_assessment_response": get_assessment_response})
@@ -615,7 +620,7 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id) -
 
         add_lesson_api = get_config_value('ALL_APIS', 'add_lesson_api', None)
         add_lesson_payload = {"userId": user_id, "sessionId": session_id, "milestone": "discoverylist/discovery/" + current_collection.get("collectionId"), "lesson": current_collection.get("name"), "progress": 100,
-                              "milestoneLevel": user_milestone_level, "language": language}
+                              "milestoneLevel": user_milestone_level, "language": learning_language}
         add_lesson_response = requests.request("POST", add_lesson_api, headers=headers, data=json.dumps(add_lesson_payload))
         logger.info({"user_id": user_id, "add_lesson_response": add_lesson_response})
 
@@ -659,10 +664,12 @@ def get_showcase_content(user_id, language) -> OutputResponse:
 
     logger.info({"user_id": user_id, "Redis stored_user_showcase_contents": stored_user_showcase_contents})
 
+    learning_language = get_config_value('request', 'learn_language', None)
+
     if stored_user_showcase_contents is None:
         get_showcase_contents_api = get_config_value('ALL_APIS', 'get_showcase_contents_api', None) + user_id
         # defining a params dict for the parameters to be sent to the API
-        params = {'language': language, 'contentlimit': 10, 'gettargetlimit': 10}
+        params = {'language': learning_language, 'contentlimit': 10, 'gettargetlimit': 10}
         # sending get request and saving the response as response object
         showcase_contents_response = requests.get(url=get_showcase_contents_api + user_id, params=params)
         user_showcase_contents = showcase_contents_response.json()["content"]
