@@ -591,14 +591,13 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id) -
         store_data(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection", current_collection.get("collectionId"))
         store_data(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection_category", current_collection.get("category"))
     else:
-        redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_collections")
-        redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_completed_collections")
-        redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection")
-        redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection_category")
-        redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_completed_contents")
-        redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_session")
-        redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_sub_session")
-
+        # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_collections")
+        # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_completed_collections")
+        # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection")
+        # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection_category")
+        # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_completed_contents")
+        # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_session")
+        # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_sub_session")
         output = OutputResponse(audio="completed", text="completed")
         return output
 
@@ -641,15 +640,14 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id) -
             # get_result_response = requests.request("POST", get_result_api, headers=headers, data=json.dumps(get_result_payload))
             # logger.info({"user_id": user_id, "get_result_response": get_result_response})
             # percentage = get_result_response.json()["data"]["percentage"]
-
-            redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_collections")
-            redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_completed_collections")
-            redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection")
-            redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection_category")
-            redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_completed_contents")
-            redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_session")
-            redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_sub_session")
-
+            #
+            # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_collections")
+            # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_completed_collections")
+            # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection")
+            # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_progress_collection_category")
+            # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_completed_contents")
+            # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_session")
+            # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_sub_session")
             output = OutputResponse(audio="Completed", text="Completed")
             return output
 
