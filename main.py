@@ -704,11 +704,11 @@ def get_showcase_content(user_id, language) -> OutputResponse:
             if showcase_content.get("contentId") == in_progress_content:
                 current_content = showcase_content
     else:
-        redis_client.delete(user_id + "_" + language + "_contents")
-        redis_client.delete(user_id + "_" + language + "_progress_content")
-        redis_client.delete(user_id + "_" + language + "_completed_contents")
-        redis_client.delete(user_id + "_" + language + "_session")
-        redis_client.delete(user_id + "_" + language + "_sub_session")
+        # redis_client.delete(user_id + "_" + language + "_contents")
+        # redis_client.delete(user_id + "_" + language + "_progress_content")
+        # redis_client.delete(user_id + "_" + language + "_completed_contents")
+        # redis_client.delete(user_id + "_" + language + "_session")
+        # redis_client.delete(user_id + "_" + language + "_sub_session")
 
         output = OutputResponse(audio="Completed", text="Completed")
         return output
