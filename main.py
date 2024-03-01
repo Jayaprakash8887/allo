@@ -210,10 +210,6 @@ async def query(request: QueryInputModel, x_request_id: str = Header(None, alias
         store_data(user_id + "_" + language + "_session", current_session_id)
     logger.info({"user_id": user_id, "current_session_id": current_session_id})
 
-    # setup Redis as a message store
-    message_history = RedisChatMessageHistory(
-        url="redis://" + redis_host + ":" + redis_port + "/" + redis_index, session_id=current_session_id
-    )
 
     eng_text = None
     ai_assistant = None
@@ -234,56 +230,7 @@ async def query(request: QueryInputModel, x_request_id: str = Header(None, alias
         reg_text, eng_text, error_message = process_incoming_voice(audio_url, language)
         logger.debug("audio converted:: eng_text:: ", eng_text)
 
-    tools = [voice_maker]
-
-    print("system_rules:: ", system_rules)
-
-    prompt = OpenAIFunctionsAgent.create_prompt(
-        system_message=SystemMessage(
-            content=system_rules,
-        ),
-        extra_prompt_messages=[
-            MessagesPlaceholder(variable_name='chat_history'),
-            HumanMessagePromptTemplate.from_template("user: {input}, language: {input_language}, history: {chat_history}"),
-
-            MessagesPlaceholder(variable_name="agent_scratchpad")
-        ]
-    )
-
-    agent = OpenAIFunctionsAgent(llm=llm, tools=tools, prompt=prompt)
-
-    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-
-    print({"input_text": input_text, "eng_text": eng_text, "chat_history": message_history.messages, "input_language": language})
-
-    llm_response = agent_executor.invoke({"input": eng_text, "chat_history": message_history.messages, "input_language": language})
-
-    logger.info({"llm response": llm_response})
-
-    message_history.add_user_message(eng_text)
-    try:
-        ai_assistant = llm_response["output"]["eng_text"]
-        message_history.add_ai_message(ai_assistant)
-        audio_output_url = llm_response["output"]["audio"]
-        ai_reg_text = llm_response["output"]["reg_text"]
-    except:
-        ai_assistant = llm_response["output"]
-        message_history.add_ai_message(llm_response["output"])
-        response = llm_response['output']
-        audio_output_url, ai_reg_text = process_outgoing_voice_manual(response, language)
-
-    if ai_assistant.startswith("Goodbye") and ai_assistant.endswith("See you soon!"):
-        message_history.clear()
-
-    if ai_assistant == "user_agreed":
-        content_response = func_get_content(user_id, language)
-    else:
-        conversation_text = ai_reg_text
-        conversation_audio = audio_output_url
-        conversation_response = ConversationResponse(audio=conversation_audio, text=conversation_text)
-        content_response = GetContentResponse(conversation=conversation_response)
-
-    logger.info({"content_response": content_response})
+    content_response = invoke_llm(user_id, language, current_session_id, eng_text)
     return content_response
 
 
@@ -496,13 +443,15 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
                 conversation_text = "Well tried! Here is the next word:"
                 conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-062956.mp3"
     else:
-        match language:
-            case "kn":
-                conversation_text = "ನೀವು ಮೌಲ್ಯಮಾಪನವನ್ನು ಪೂರ್ಣಗೊಳಿಸಿದ್ದೀರಿ! ಹೊಸದಾಗಿ ಪ್ರಾರಂಭಿಸಲು ಮರು-ಲಾಗಿನ್ ಮಾಡಿ."
-                conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-064932.mp3"
-            case _:
-                conversation_text = "You have completed the assessment! Re-login to start fresh."
-                conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-065008.mp3"
+        content_response = invoke_llm(user_id, language, current_session_id, 'user_completed')
+        return content_response
+        # match language:
+        #     case "kn":
+        #         conversation_text = "ನೀವು ಮೌಲ್ಯಮಾಪನವನ್ನು ಪೂರ್ಣಗೊಳಿಸಿದ್ದೀರಿ! ಹೊಸದಾಗಿ ಪ್ರಾರಂಭಿಸಲು ಮರು-ಲಾಗಿನ್ ಮಾಡಿ."
+        #         conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-064932.mp3"
+        #     case _:
+        #         conversation_text = "You have completed the assessment! Re-login to start fresh."
+        #         conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-065008.mp3"
 
     conversation_response = ConversationResponse(audio=conversation_audio, text=conversation_text)
 
@@ -510,6 +459,64 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
         content_response = GetContentResponse(conversation=conversation_response, content=output_response)
     else:
         content_response = GetContentResponse(conversation=conversation_response)
+    return content_response
+
+
+def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentResponse:
+
+    # setup Redis as a message store
+    message_history = RedisChatMessageHistory(
+        url="redis://" + redis_host + ":" + redis_port + "/" + redis_index, session_id=current_session_id
+    )
+
+    tools = [voice_maker]
+
+    print("system_rules:: ", system_rules)
+
+    prompt = OpenAIFunctionsAgent.create_prompt(
+        system_message=SystemMessage(
+            content=system_rules,
+        ),
+        extra_prompt_messages=[
+            MessagesPlaceholder(variable_name='chat_history'),
+            HumanMessagePromptTemplate.from_template("user: {input}, language: {input_language}, history: {chat_history}"),
+
+            MessagesPlaceholder(variable_name="agent_scratchpad")
+        ]
+    )
+
+    agent = OpenAIFunctionsAgent(llm=llm, tools=tools, prompt=prompt)
+
+    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+
+    llm_response = agent_executor.invoke({"input": user_input, "chat_history": message_history.messages, "input_language": language})
+
+    logger.info({"llm response": llm_response})
+
+    message_history.add_user_message(user_input)
+    try:
+        ai_assistant = llm_response["output"]["eng_text"]
+        message_history.add_ai_message(ai_assistant)
+        audio_output_url = llm_response["output"]["audio"]
+        ai_reg_text = llm_response["output"]["reg_text"]
+    except:
+        ai_assistant = llm_response["output"]
+        message_history.add_ai_message(llm_response["output"])
+        response = llm_response['output']
+        audio_output_url, ai_reg_text = process_outgoing_voice_manual(response, language)
+
+    if ai_assistant.startswith("Goodbye") and ai_assistant.endswith("See you soon!"):
+        message_history.clear()
+
+    if ai_assistant == "user_agreed":
+        content_response = func_get_content(user_id, language)
+    else:
+        conversation_text = ai_reg_text
+        conversation_audio = audio_output_url
+        conversation_response = ConversationResponse(audio=conversation_audio, text=conversation_text)
+        content_response = GetContentResponse(conversation=conversation_response)
+
+    logger.info({"content_response": content_response})
     return content_response
 
 
