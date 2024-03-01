@@ -487,7 +487,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
 
     logger.info({"user_id": user_id, "output_response": output_response})
 
-    if output_response.audio != "completed":
+    if output_response.content_id is not None:
         match language:
             case "kn":
                 conversation_text = "ಉತ್ತಮ ಪ್ರಯತ್ನ! ಮುಂದಿನ ಪದ ಇಲ್ಲಿದೆ: "
@@ -506,7 +506,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
 
     conversation_response = ConversationResponse(audio=conversation_audio, text=conversation_text)
 
-    if output_response.audio != "completed":
+    if output_response.audio is not None:
         content_response = GetContentResponse(conversation=conversation_response, content=output_response)
     else:
         content_response = GetContentResponse(conversation=conversation_response)
