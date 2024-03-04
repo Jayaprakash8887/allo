@@ -425,7 +425,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
         raise HTTPException(500, "Submitted response could not be registered!")
 
     if mode == "discovery":
-        output_response = get_discovery_content(user_milestone_level, user_id, language, current_session_id, sub_session_id)
+        output_response = get_discovery_content(user_milestone_level, user_id, language, current_session_id)
     else:
         output_response = get_showcase_content(user_id, language)
 
