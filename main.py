@@ -4,6 +4,7 @@ import string
 from datetime import datetime
 from typing import Optional
 
+import openai
 import redis
 from dotenv import load_dotenv
 from fastapi import FastAPI, status, Header
@@ -435,13 +436,31 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     logger.info({"user_id": user_id, "output_response": output_response})
 
     if output_response.content_id is not None:
-        match language:
-            case "kn":
-                conversation_text = "ಉತ್ತಮ ಪ್ರಯತ್ನ! ಮುಂದಿನ ಪದ ಇಲ್ಲಿದೆ: "
-                conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-112329.mp3"
-            case _:
-                conversation_text = "Well tried! Here is the next word:"
-                conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-062956.mp3"
+        # match language:
+        #     case "kn":
+        #         conversation_text = "ಉತ್ತಮ ಪ್ರಯತ್ನ! ಮುಂದಿನ ಪದ ಇಲ್ಲಿದೆ: "
+        #         conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-112329.mp3"
+        #     case _:
+        #         conversation_text = "Well tried! Here is the next word:"
+        #         conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-062956.mp3"
+
+        llm_client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+        nudge_user_prompt = get_config_value("llm", "nudge_user_prompt", None)
+        logger.debug(f"nudge_user_prompt: {nudge_user_prompt}")
+        nudge_message = None
+        if nudge_user_prompt:
+            nudge_res = llm_client.chat.completions.create(
+                model=gpt_model,
+                messages=[
+                    {"role": "system", "content": nudge_user_prompt}
+                ],
+            )
+            nudge_res_message = nudge_res.choices[0].message.model_dump()
+            nudge_message = nudge_res_message["content"]
+            logger.info({"user_id": user_id, "user_language": language, "nudge_message": nudge_message})
+
+        conversation_audio, conversation_text = process_outgoing_voice_manual(nudge_message, language)
+
     else:
         content_response = invoke_llm(user_id, language, current_session_id, 'user_completed')
         return content_response
