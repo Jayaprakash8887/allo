@@ -486,9 +486,9 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
         ]
     )
 
-    agent = OpenAIFunctionsAgent(llm=llm, tools=None, prompt=prompt)
+    agent = OpenAIFunctionsAgent(llm=llm, prompt=prompt)
 
-    agent_executor = AgentExecutor(agent=agent, tools=None, verbose=True)
+    agent_executor = AgentExecutor(agent=agent, verbose=True)
 
     llm_response = agent_executor.invoke({"input": user_input, "chat_history": message_history.messages, "input_language": language})
 
