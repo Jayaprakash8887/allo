@@ -501,17 +501,18 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
         ai_assistant = llm_response["output"]["eng_text"]
         if ai_assistant in user_learning_emotions.keys():
             ai_assistant = user_learning_emotions.get(ai_assistant)
-
-        message_history.add_ai_message(ai_assistant)
-        audio_output_url = llm_response["output"]["audio"]
-        ai_reg_text = llm_response["output"]["reg_text"]
+            message_history.add_ai_message(ai_assistant)
+            audio_output_url, ai_reg_text = process_outgoing_voice_manual(ai_assistant, language)
+        else:
+            message_history.add_ai_message(ai_assistant)
+            audio_output_url = llm_response["output"]["audio"]
+            ai_reg_text = llm_response["output"]["reg_text"]
     except:
         ai_assistant = llm_response["output"]
         if ai_assistant in user_learning_emotions.keys():
             ai_assistant = user_learning_emotions.get(ai_assistant)
-        message_history.add_ai_message(llm_response["output"])
-        response = llm_response['output']
-        audio_output_url, ai_reg_text = process_outgoing_voice_manual(response, language)
+        message_history.add_ai_message(ai_assistant)
+        audio_output_url, ai_reg_text = process_outgoing_voice_manual(ai_assistant, language)
 
     if ai_assistant.startswith("Goodbye") and ai_assistant.endswith("See you soon!"):
         message_history.clear()
