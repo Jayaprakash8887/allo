@@ -469,7 +469,7 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
         url="redis://" + redis_host + ":" + redis_port + "/" + redis_index, session_id=current_session_id
     )
 
-    tools = [voice_maker]
+    tools = []
 
     print("system_rules:: ", system_rules)
 
@@ -494,16 +494,17 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
     logger.info({"llm response": llm_response})
 
     message_history.add_user_message(user_input)
-    try:
-        ai_assistant = llm_response["output"]["eng_text"]
-        message_history.add_ai_message(ai_assistant)
-        audio_output_url = llm_response["output"]["audio"]
-        ai_reg_text = llm_response["output"]["reg_text"]
-    except:
-        ai_assistant = llm_response["output"]
-        message_history.add_ai_message(llm_response["output"])
-        response = llm_response['output']
-        audio_output_url, ai_reg_text = process_outgoing_voice_manual(response, language)
+
+    ai_assistant = llm_response["output"]
+    message_history.add_ai_message(llm_response["output"])
+
+    if " | " in ai_assistant:
+        emotion_index = ai_assistant.index(" | ")
+        user_emotion = ai_assistant[:emotion_index]
+        print("user_emotion:: ", user_emotion)
+        ai_assistant = ai_assistant[emotion_index+3:]
+
+    audio_output_url, ai_reg_text = process_outgoing_voice_manual(ai_assistant, language)
 
     if ai_assistant.startswith("Goodbye") and ai_assistant.endswith("See you soon!"):
         message_history.clear()
@@ -673,8 +674,10 @@ def get_showcase_content(user_id, language) -> OutputResponse:
 
     if stored_user_showcase_contents is None:
         get_showcase_contents_api = get_config_value('ALL_APIS', 'get_showcase_contents_api', None) + user_id
+        content_limit = int(get_config_value('request', 'content_limit', None))
+        target_limit = int(get_config_value('request', 'target_limit', None))
         # defining a params dict for the parameters to be sent to the API
-        params = {'language': learning_language, 'contentlimit': 10, 'gettargetlimit': 10}
+        params = {'language': learning_language, 'contentlimit': content_limit, 'gettargetlimit': target_limit}
         # sending get request and saving the response as response object
         showcase_contents_response = requests.get(url=get_showcase_contents_api + user_id, params=params)
         user_showcase_contents = showcase_contents_response.json()["content"]
