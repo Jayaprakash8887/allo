@@ -210,7 +210,6 @@ async def query(request: QueryInputModel, x_request_id: str = Header(None, alias
         store_data(user_id + "_" + language + "_session", current_session_id)
     logger.info({"user_id": user_id, "current_session_id": current_session_id})
 
-
     eng_text = None
     ai_assistant = None
     ai_reg_text = None
@@ -391,7 +390,8 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
             store_data(user_id + "_" + language + "_sub_session", sub_session_id)
 
     update_learner_profile = get_config_value('ALL_APIS', 'update_learner_profile', None) + learning_language
-    payload = {"audio": audio, "contentId": content_id, "contentType": in_progress_collection_category, "date": formatted_date, "language": learning_language, "original_text": original_text, "session_id": current_session_id, "sub_session_id": sub_session_id,
+    payload = {"audio": audio, "contentId": content_id, "contentType": in_progress_collection_category, "date": formatted_date, "language": learning_language, "original_text": original_text, "session_id": current_session_id,
+               "sub_session_id": sub_session_id,
                "user_id": user_id}
     headers = {
         'Content-Type': 'application/json'
@@ -462,8 +462,9 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     return content_response
 
 
-def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentResponse:
+user_learning_emotions = json.loads(get_config_value('request', 'user_emotions_response', None))
 
+def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentResponse:
     # setup Redis as a message store
     message_history = RedisChatMessageHistory(
         url="redis://" + redis_host + ":" + redis_port + "/" + redis_index, session_id=current_session_id
@@ -498,11 +499,8 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
     ai_assistant = llm_response["output"]
     message_history.add_ai_message(llm_response["output"])
 
-    if " | " in ai_assistant:
-        emotion_index = ai_assistant.index(" | ")
-        user_emotion = ai_assistant[:emotion_index]
-        print("user_emotion:: ", user_emotion)
-        ai_assistant = ai_assistant[emotion_index+3:]
+    if ai_assistant in user_learning_emotions.keys():
+        ai_assistant = user_learning_emotions.get(ai_assistant)
 
     audio_output_url, ai_reg_text = process_outgoing_voice_manual(ai_assistant, language)
 
