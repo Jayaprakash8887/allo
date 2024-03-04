@@ -464,13 +464,14 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
 
 user_learning_emotions = json.loads(get_config_value('request', 'user_emotions_response', None))
 
+
 def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentResponse:
     # setup Redis as a message store
     message_history = RedisChatMessageHistory(
         url="redis://" + redis_host + ":" + redis_port + "/" + redis_index, session_id=current_session_id
     )
 
-    tools = []
+    tools = [voice_maker]
 
     print("system_rules:: ", system_rules)
 
@@ -486,9 +487,9 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
         ]
     )
 
-    agent = OpenAIFunctionsAgent(llm=llm, prompt=prompt)
+    agent = OpenAIFunctionsAgent(llm=llm, tools=tools, prompt=prompt)
 
-    agent_executor = AgentExecutor(agent=agent, verbose=True)
+    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 
     llm_response = agent_executor.invoke({"input": user_input, "chat_history": message_history.messages, "input_language": language})
 
@@ -496,13 +497,21 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
 
     message_history.add_user_message(user_input)
 
-    ai_assistant = llm_response["output"]
-    message_history.add_ai_message(llm_response["output"])
+    try:
+        ai_assistant = llm_response["output"]["eng_text"]
+        if ai_assistant in user_learning_emotions.keys():
+            ai_assistant = user_learning_emotions.get(ai_assistant)
 
-    if ai_assistant in user_learning_emotions.keys():
-        ai_assistant = user_learning_emotions.get(ai_assistant)
-
-    audio_output_url, ai_reg_text = process_outgoing_voice_manual(ai_assistant, language)
+        message_history.add_ai_message(ai_assistant)
+        audio_output_url = llm_response["output"]["audio"]
+        ai_reg_text = llm_response["output"]["reg_text"]
+    except:
+        ai_assistant = llm_response["output"]
+        if ai_assistant in user_learning_emotions.keys():
+            ai_assistant = user_learning_emotions.get(ai_assistant)
+        message_history.add_ai_message(llm_response["output"])
+        response = llm_response['output']
+        audio_output_url, ai_reg_text = process_outgoing_voice_manual(response, language)
 
     if ai_assistant.startswith("Goodbye") and ai_assistant.endswith("See you soon!"):
         message_history.clear()
