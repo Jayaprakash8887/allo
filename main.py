@@ -27,8 +27,11 @@ from utils import is_url, is_base64
 gpt_model = get_config_value("llm", "gpt_model", None)
 
 welcome_prompt = get_config_value("llm", "all_chat_prompt", None)
-
 feedback_prompt = get_config_value("llm", "feedback_prompt", None)
+nudge_user_prompt = get_config_value("llm", "nudge_user_prompt", None)
+closure_prompt = get_config_value("llm", "closure_prompt", None)
+
+llm_client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 app = FastAPI(title="ALL BOT Service",
               #   docs_url=None,  # Swagger UI: disable it by setting docs_url=None
@@ -159,7 +162,7 @@ voice_maker = StructuredTool.from_function(
 )
 
 
-def capture_user_emotions(user_id, user_feedback, emotion_category, session_id, language, next_message):
+def capture_user_emotions(user_id: str, user_feedback: str, emotion_category: str, session_id: str, language: str, next_message: str):
     logger.info({"user_id": user_id, "language": language, "session_id": session_id, "user_feedback": user_feedback, "emotion_category": emotion_category})
     user_session_emotions = retrieve_data(user_id + "_" + language + "_" + session_id + "_emotions")
     logger.info({"user_id": user_id, "language": language, "session_id": session_id, "user_session_emotions": user_session_emotions})
@@ -170,6 +173,22 @@ def capture_user_emotions(user_id, user_feedback, emotion_category, session_id, 
         user_session_emotions = [emotion_category]
 
     store_data(user_id + "_" + language + "_" + session_id + "_emotions", json.dumps(user_session_emotions))
+
+    if not next_message:
+        logger.debug(f"closure_prompt: {closure_prompt}")
+        if closure_prompt:
+            closure_res = llm_client.chat.completions.create(
+                model=gpt_model,
+                messages=[
+                    {"role": "system", "content": closure_prompt},
+                    {"role": "user", "content": user_session_emotions}
+                ],
+            )
+            closure_res_message = closure_res.choices[0].message.model_dump()
+            closure_message = closure_res_message["content"]
+            logger.inf({"user_id": user_id, "language": language, "session_id": session_id, "closure_message": closure_message})
+            next_message = closure_message
+
     return process_outgoing_voice(next_message, language)
 
 
@@ -486,8 +505,6 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
         #         conversation_text = "Well tried! Here is the next word:"
         #         conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-062956.mp3"
 
-        llm_client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-        nudge_user_prompt = get_config_value("llm", "nudge_user_prompt", None)
         logger.debug(f"nudge_user_prompt: {nudge_user_prompt}")
         nudge_message = None
         if nudge_user_prompt:
