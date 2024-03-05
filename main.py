@@ -26,7 +26,9 @@ from utils import is_url, is_base64
 
 gpt_model = get_config_value("llm", "gpt_model", None)
 
-system_rules = get_config_value("llm", "all_chat_prompt", None)
+welcome_prompt = get_config_value("llm", "all_chat_prompt", None)
+
+feedback_prompt = get_config_value("llm", "all_chat_prompt", None)
 
 app = FastAPI(title="ALL BOT Service",
               #   docs_url=None,  # Swagger UI: disable it by setting docs_url=None
@@ -157,6 +159,24 @@ voice_maker = StructuredTool.from_function(
 )
 
 
+class UserEmotionsInput(BaseModel):
+    user_id: str = Field(description="user id")
+    user_feedback: str = Field(description="user feedback")
+    emotion_category: str = Field(description="emotion category")
+    session_id: str = Field(description="user session id")
+    language: str = Field(description="user language")
+
+
+store_user_emotions = StructuredTool.from_function(
+    func=capture_user_emotions,
+    name="StoreUserEmotions",
+    description="used to capture emotions of the user's feedback",
+    args_schema=UserEmotionsInput,
+    return_direct=True,
+    handle_tool_error=_handle_error,
+)
+
+
 @app.get("/", include_in_schema=False)
 async def root():
     return {"message": "Welcome to ALL BOT Service"}
@@ -230,8 +250,15 @@ async def query(request: QueryInputModel, x_request_id: str = Header(None, alias
         reg_text, eng_text, error_message = process_incoming_voice(audio_url, language)
         logger.debug("audio converted:: eng_text:: ", eng_text)
 
-    content_response = invoke_llm(user_id, language, current_session_id, eng_text)
-    return content_response
+    session_completed = retrieve_data(user_id + "_" + language + "_" + current_session_id + "_completed")
+    if session_completed is None:
+        store_data(user_id + "_" + language + "_" + current_session_id + "_completed", "false")
+        session_completed = "false"
+
+    if session_completed == "true":
+        return invoke_llm_feedback(user_id, language, current_session_id, 'user_completed')
+    else:
+        return invoke_llm(user_id, language, current_session_id, eng_text)
 
 
 @app.post("/v1/get_content", include_in_schema=True)
@@ -292,7 +319,7 @@ def func_get_content(user_id, language) -> GetContentResponse:
         output_response = get_discovery_content(user_milestone_level, user_id, language, current_session_id)
     else:
         store_data(user_id + "_" + language + "_session", current_session_id)
-        output_response = get_showcase_content(user_id, language)
+        output_response = get_showcase_content(user_id, language, current_session_id)
 
     match language:
         case "kn":
@@ -428,7 +455,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     if mode == "discovery":
         output_response = get_discovery_content(user_milestone_level, user_id, language, current_session_id)
     else:
-        output_response = get_showcase_content(user_id, language)
+        output_response = get_showcase_content(user_id, language, current_session_id)
 
     conversation_text = None
     conversation_audio = None
@@ -462,9 +489,8 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
         conversation_audio, conversation_text = process_outgoing_voice_manual(nudge_message, language)
 
     else:
-        content_response = invoke_llm(user_id, language, current_session_id, 'user_completed')
-        return content_response
-        # match language:
+        store_data(user_id + "_" + language + "_" + current_session_id + "_completed", "true")
+        return invoke_llm_feedback(user_id, language, current_session_id, 'user_completed')  # match language:
         #     case "kn":
         #         conversation_text = "ನೀವು ಮೌಲ್ಯಮಾಪನವನ್ನು ಪೂರ್ಣಗೊಳಿಸಿದ್ದೀರಿ! ಹೊಸದಾಗಿ ಪ್ರಾರಂಭಿಸಲು ಮರು-ಲಾಗಿನ್ ಮಾಡಿ."
         #         conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-064932.mp3"
@@ -492,11 +518,11 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
 
     tools = [voice_maker]
 
-    print("system_rules:: ", system_rules)
+    print("welcome_prompt:: ", welcome_prompt)
 
     prompt = OpenAIFunctionsAgent.create_prompt(
         system_message=SystemMessage(
-            content=system_rules,
+            content=welcome_prompt,
         ),
         extra_prompt_messages=[
             MessagesPlaceholder(variable_name='chat_history'),
@@ -545,6 +571,61 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
         content_response = GetContentResponse(conversation=conversation_response)
 
     logger.info({"content_response": content_response})
+    return content_response
+
+
+def invoke_llm_feedback(user_id, language, current_session_id, user_input) -> GetContentResponse:
+    # setup Redis as a message store
+    message_history = RedisChatMessageHistory(
+        url="redis://" + redis_host + ":" + redis_port + "/" + redis_index, session_id=current_session_id + "_feedback"
+    )
+
+    tools = [store_user_emotions]
+
+    print("feedback_prompt:: ", feedback_prompt)
+
+    prompt = OpenAIFunctionsAgent.create_prompt(
+        system_message=SystemMessage(
+            content=feedback_prompt,
+        ),
+        extra_prompt_messages=[
+            MessagesPlaceholder(variable_name='chat_history'),
+            HumanMessagePromptTemplate.from_template("user: {input}, language: {input_language}, history: {chat_history}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad")
+        ]
+    )
+
+    agent = OpenAIFunctionsAgent(llm=llm, tools=tools, prompt=prompt)
+
+    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+
+    llm_response = agent_executor.invoke({"input": user_input, "chat_history": message_history.messages, "input_language": language, "user_id": user_id, "session_id": current_session_id})
+
+    logger.info({"feedback llm response": llm_response})
+
+    message_history.add_user_message(user_input)
+
+    try:
+        ai_assistant = llm_response["output"]["eng_text"]
+        message_history.add_ai_message(ai_assistant)
+        audio_output_url = llm_response["output"]["audio"]
+        ai_reg_text = llm_response["output"]["reg_text"]
+    except:
+        ai_assistant = llm_response["output"]
+        if ai_assistant in user_learning_emotions.keys():
+            ai_assistant = user_learning_emotions.get(ai_assistant)
+        message_history.add_ai_message(ai_assistant)
+        audio_output_url, ai_reg_text = process_outgoing_voice_manual(ai_assistant, language)
+
+    if ai_assistant.startswith("Goodbye") and ai_assistant.endswith("See you soon!"):
+        message_history.clear()
+
+    conversation_text = ai_reg_text
+    conversation_audio = audio_output_url
+    conversation_response = ConversationResponse(audio=conversation_audio, text=conversation_text)
+    content_response = GetContentResponse(conversation=conversation_response)
+
+    logger.info({"feedback content_response": content_response})
     return content_response
 
 
@@ -626,6 +707,7 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id) -
         # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_completed_contents")
         # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_session")
         # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_sub_session")
+        store_data(user_id + "_" + language + "_" + session_id + "_completed", "true")
         output = OutputResponse(audio="completed", text="completed")
         return output
 
@@ -676,7 +758,8 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id) -
             # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_completed_contents")
             # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_session")
             # redis_client.delete(user_id + "_" + language + "_" + user_milestone_level + "_sub_session")
-            output = OutputResponse(audio="Completed", text="Completed")
+            store_data(user_id + "_" + language + "_" + session_id + "_completed", "true")
+            output = OutputResponse(audio="completed", text="completed")
             return output
 
     content_source_data = current_collection.get("content")[0].get("contentSourceData")[0]
@@ -688,7 +771,7 @@ def get_discovery_content(user_milestone_level, user_id, language, session_id) -
     return output
 
 
-def get_showcase_content(user_id, language) -> OutputResponse:
+def get_showcase_content(user_id, language, current_session_id) -> OutputResponse:
     current_content = None
     stored_user_showcase_contents: str = retrieve_data(user_id + "_" + language + "_showcase_contents")
     user_showcase_contents = []
@@ -739,8 +822,8 @@ def get_showcase_content(user_id, language) -> OutputResponse:
         # redis_client.delete(user_id + "_" + language + "_completed_contents")
         # redis_client.delete(user_id + "_" + language + "_session")
         # redis_client.delete(user_id + "_" + language + "_sub_session")
-
-        output = OutputResponse(audio="Completed", text="Completed")
+        store_data(user_id + "_" + language + "_" + current_session_id + "_completed", "true")
+        output = OutputResponse(audio="completed", text="completed")
         return output
 
     logger.info({"user_id": user_id, "current_content": current_content})
@@ -751,3 +834,16 @@ def get_showcase_content(user_id, language) -> OutputResponse:
 
     output = OutputResponse(audio=audio_url, text=content_source_data.get("text"), content_id=content_id)
     return output
+
+
+def capture_user_emotions(user_id, user_feedback, emotion_category, session_id, language):
+    logger.info({"user_id": user_id, "language": language, "session_id": session_id, "user_feedback": user_feedback, "emotion_category": emotion_category})
+    user_session_emotions = retrieve_data(user_id + "_" + language + "_" + session_id + "_emotions")
+    logger.info({"user_id": user_id, "language": language, "session_id": session_id, "user_session_emotions": user_session_emotions})
+    if user_session_emotions:
+        user_session_emotions = json.loads(user_session_emotions)
+        user_session_emotions.append(emotion_category)
+    else:
+        user_session_emotions = [emotion_category]
+
+    store_data(user_id + "_" + language + "_" + session_id + "_emotions", json.dumps(user_session_emotions))
