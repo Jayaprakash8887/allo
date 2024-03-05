@@ -269,7 +269,7 @@ async def query(request: QueryInputModel, x_request_id: str = Header(None, alias
         session_completed = "false"
 
     if session_completed == "true":
-        return invoke_llm_feedback(user_id, language, current_session_id, 'user_completed')
+        return invoke_llm_feedback(user_id, language, current_session_id, eng_text)
     else:
         return invoke_llm(user_id, language, current_session_id, eng_text)
 
@@ -581,9 +581,9 @@ def invoke_llm_feedback(user_id, language, current_session_id, user_input) -> Ge
         url="redis://" + redis_host + ":" + redis_port + "/" + redis_index, session_id=current_session_id + "_feedback"
     )
 
-    feedabck_tools = [store_user_emotions]
+    feedback_tools = [store_user_emotions]
 
-    print("feedback_prompt:: ", feedback_prompt)
+    # print("feedback_prompt:: ", feedback_prompt)
 
     user_fb_prompt = OpenAIFunctionsAgent.create_prompt(
         system_message=SystemMessage(
@@ -591,14 +591,16 @@ def invoke_llm_feedback(user_id, language, current_session_id, user_input) -> Ge
         ),
         extra_prompt_messages=[
             MessagesPlaceholder(variable_name='chat_history'),
-            HumanMessagePromptTemplate.from_template("user: {input}, language: {input_language}, history: {chat_history}"),
+            HumanMessagePromptTemplate.from_template("user: {input}, language: {input_language}, history: {chat_history}, user_id: {user_id}, session_id: {session_id}"),
             MessagesPlaceholder(variable_name="agent_scratchpad")
         ]
     )
 
-    fb_agent = OpenAIFunctionsAgent(llm=llm, tools=feedabck_tools, prompt=user_fb_prompt)
+    fb_agent = OpenAIFunctionsAgent(llm=llm, tools=feedback_tools, prompt=user_fb_prompt)
 
-    fb_agent_executor = AgentExecutor(agent=fb_agent, tools=feedabck_tools, verbose=True)
+    fb_agent_executor = AgentExecutor(agent=fb_agent, tools=feedback_tools, verbose=True)
+
+    logger.info({"input": user_input, "chat_history": feedback_message_history.messages, "input_language": language, "user_id": user_id, "session_id": current_session_id})
 
     fb_llm_response = fb_agent_executor.invoke({"input": user_input, "chat_history": feedback_message_history.messages, "input_language": language, "user_id": user_id, "session_id": current_session_id})
 
