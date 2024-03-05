@@ -159,7 +159,7 @@ voice_maker = StructuredTool.from_function(
 )
 
 
-def capture_user_emotions(user_id, user_feedback, emotion_category, session_id, language):
+def capture_user_emotions(user_id, user_feedback, emotion_category, session_id, language, next_message):
     logger.info({"user_id": user_id, "language": language, "session_id": session_id, "user_feedback": user_feedback, "emotion_category": emotion_category})
     user_session_emotions = retrieve_data(user_id + "_" + language + "_" + session_id + "_emotions")
     logger.info({"user_id": user_id, "language": language, "session_id": session_id, "user_session_emotions": user_session_emotions})
@@ -170,6 +170,7 @@ def capture_user_emotions(user_id, user_feedback, emotion_category, session_id, 
         user_session_emotions = [emotion_category]
 
     store_data(user_id + "_" + language + "_" + session_id + "_emotions", json.dumps(user_session_emotions))
+    return process_outgoing_voice(next_message, language)
 
 
 class UserEmotionsInput(BaseModel):
@@ -178,12 +179,13 @@ class UserEmotionsInput(BaseModel):
     emotion_category: str = Field(description="emotion category")
     session_id: str = Field(description="user session id")
     language: str = Field(description="user language")
+    next_message: str = Field(description="next question to the user")
 
 
 store_user_emotions = StructuredTool.from_function(
     func=capture_user_emotions,
     name="StoreUserEmotions",
-    description="used to capture emotions of the user's feedback",
+    description="used to capture emotions of the user's feedback and ask the next question",
     args_schema=UserEmotionsInput,
     return_direct=True,
     handle_tool_error=_handle_error,
@@ -517,6 +519,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     else:
         content_response = GetContentResponse(conversation=conversation_response)
     return content_response
+
 
 def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentResponse:
     # setup Redis as a message store
