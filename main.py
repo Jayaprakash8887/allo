@@ -28,7 +28,7 @@ gpt_model = get_config_value("llm", "gpt_model", None)
 
 welcome_prompt = get_config_value("llm", "all_chat_prompt", None)
 
-feedback_prompt = get_config_value("llm", "all_chat_prompt", None)
+feedback_prompt = get_config_value("llm", "feedback_prompt", None)
 
 app = FastAPI(title="ALL BOT Service",
               #   docs_url=None,  # Swagger UI: disable it by setting docs_url=None
@@ -500,7 +500,6 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
             logger.info({"user_id": user_id, "user_language": language, "nudge_message": nudge_message})
 
         conversation_audio, conversation_text = process_outgoing_voice_manual(nudge_message, language)
-
     else:
         store_data(user_id + "_" + language + "_" + current_session_id + "_completed", "true")
         return invoke_llm_feedback(user_id, language, current_session_id, 'user_completed')  # match language:
@@ -518,10 +517,6 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
     else:
         content_response = GetContentResponse(conversation=conversation_response)
     return content_response
-
-
-user_learning_emotions = json.loads(get_config_value('request', 'user_emotions_response', None))
-
 
 def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentResponse:
     # setup Redis as a message store
@@ -557,18 +552,11 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
 
     try:
         ai_assistant = llm_response["output"]["eng_text"]
-        if ai_assistant in user_learning_emotions.keys():
-            ai_assistant = user_learning_emotions.get(ai_assistant)
-            message_history.add_ai_message(ai_assistant)
-            audio_output_url, ai_reg_text = process_outgoing_voice_manual(ai_assistant, language)
-        else:
-            message_history.add_ai_message(ai_assistant)
-            audio_output_url = llm_response["output"]["audio"]
-            ai_reg_text = llm_response["output"]["reg_text"]
+        message_history.add_ai_message(ai_assistant)
+        audio_output_url = llm_response["output"]["audio"]
+        ai_reg_text = llm_response["output"]["reg_text"]
     except:
         ai_assistant = llm_response["output"]
-        if ai_assistant in user_learning_emotions.keys():
-            ai_assistant = user_learning_emotions.get(ai_assistant)
         message_history.add_ai_message(ai_assistant)
         audio_output_url, ai_reg_text = process_outgoing_voice_manual(ai_assistant, language)
 
@@ -589,15 +577,15 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
 
 def invoke_llm_feedback(user_id, language, current_session_id, user_input) -> GetContentResponse:
     # setup Redis as a message store
-    message_history = RedisChatMessageHistory(
+    feedback_message_history = RedisChatMessageHistory(
         url="redis://" + redis_host + ":" + redis_port + "/" + redis_index, session_id=current_session_id + "_feedback"
     )
 
-    tools = [store_user_emotions]
+    feedabck_tools = [store_user_emotions]
 
     print("feedback_prompt:: ", feedback_prompt)
 
-    prompt = OpenAIFunctionsAgent.create_prompt(
+    user_fb_prompt = OpenAIFunctionsAgent.create_prompt(
         system_message=SystemMessage(
             content=feedback_prompt,
         ),
@@ -608,30 +596,28 @@ def invoke_llm_feedback(user_id, language, current_session_id, user_input) -> Ge
         ]
     )
 
-    agent = OpenAIFunctionsAgent(llm=llm, tools=tools, prompt=prompt)
+    fb_agent = OpenAIFunctionsAgent(llm=llm, tools=feedabck_tools, prompt=user_fb_prompt)
 
-    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+    fb_agent_executor = AgentExecutor(agent=fb_agent, tools=feedabck_tools, verbose=True)
 
-    llm_response = agent_executor.invoke({"input": user_input, "chat_history": message_history.messages, "input_language": language, "user_id": user_id, "session_id": current_session_id})
+    fb_llm_response = fb_agent_executor.invoke({"input": user_input, "chat_history": feedback_message_history.messages, "input_language": language, "user_id": user_id, "session_id": current_session_id})
 
-    logger.info({"feedback llm response": llm_response})
+    logger.info({"feedback llm response": fb_llm_response})
 
-    message_history.add_user_message(user_input)
+    feedback_message_history.add_user_message(user_input)
 
     try:
-        ai_assistant = llm_response["output"]["eng_text"]
-        message_history.add_ai_message(ai_assistant)
-        audio_output_url = llm_response["output"]["audio"]
-        ai_reg_text = llm_response["output"]["reg_text"]
+        fb_ai_assistant = fb_llm_response["output"]["eng_text"]
+        feedback_message_history.add_ai_message(fb_ai_assistant)
+        audio_output_url = fb_llm_response["output"]["audio"]
+        ai_reg_text = fb_llm_response["output"]["reg_text"]
     except:
-        ai_assistant = llm_response["output"]
-        if ai_assistant in user_learning_emotions.keys():
-            ai_assistant = user_learning_emotions.get(ai_assistant)
-        message_history.add_ai_message(ai_assistant)
-        audio_output_url, ai_reg_text = process_outgoing_voice_manual(ai_assistant, language)
+        fb_ai_assistant = fb_llm_response["output"]
+        feedback_message_history.add_ai_message(fb_ai_assistant)
+        audio_output_url, ai_reg_text = process_outgoing_voice_manual(fb_ai_assistant, language)
 
-    if ai_assistant.startswith("Goodbye") and ai_assistant.endswith("See you soon!"):
-        message_history.clear()
+    if fb_ai_assistant.startswith("Goodbye") and fb_ai_assistant.endswith("See you soon!"):
+        feedback_message_history.clear()
 
     conversation_text = ai_reg_text
     conversation_audio = audio_output_url
