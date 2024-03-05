@@ -159,6 +159,19 @@ voice_maker = StructuredTool.from_function(
 )
 
 
+def capture_user_emotions(user_id, user_feedback, emotion_category, session_id, language):
+    logger.info({"user_id": user_id, "language": language, "session_id": session_id, "user_feedback": user_feedback, "emotion_category": emotion_category})
+    user_session_emotions = retrieve_data(user_id + "_" + language + "_" + session_id + "_emotions")
+    logger.info({"user_id": user_id, "language": language, "session_id": session_id, "user_session_emotions": user_session_emotions})
+    if user_session_emotions:
+        user_session_emotions = json.loads(user_session_emotions)
+        user_session_emotions.append(emotion_category)
+    else:
+        user_session_emotions = [emotion_category]
+
+    store_data(user_id + "_" + language + "_" + session_id + "_emotions", json.dumps(user_session_emotions))
+
+
 class UserEmotionsInput(BaseModel):
     user_id: str = Field(description="user id")
     user_feedback: str = Field(description="user feedback")
@@ -834,16 +847,3 @@ def get_showcase_content(user_id, language, current_session_id) -> OutputRespons
 
     output = OutputResponse(audio=audio_url, text=content_source_data.get("text"), content_id=content_id)
     return output
-
-
-def capture_user_emotions(user_id, user_feedback, emotion_category, session_id, language):
-    logger.info({"user_id": user_id, "language": language, "session_id": session_id, "user_feedback": user_feedback, "emotion_category": emotion_category})
-    user_session_emotions = retrieve_data(user_id + "_" + language + "_" + session_id + "_emotions")
-    logger.info({"user_id": user_id, "language": language, "session_id": session_id, "user_session_emotions": user_session_emotions})
-    if user_session_emotions:
-        user_session_emotions = json.loads(user_session_emotions)
-        user_session_emotions.append(emotion_category)
-    else:
-        user_session_emotions = [emotion_category]
-
-    store_data(user_id + "_" + language + "_" + session_id + "_emotions", json.dumps(user_session_emotions))
