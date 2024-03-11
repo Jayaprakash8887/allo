@@ -617,8 +617,11 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
         llm_base_path,
         json={"model": gpt_model, "messages": messages, "stream": True},
     )
+    logger.info({"user_id": user_id, "user_language": language, "welcome_res": welcome_res, "type_welcome_res": type(welcome_res)})
+    logger.info({"user_id": user_id, "user_language": language, "welcome_res_message": welcome_res.content})
     welcome_res_message = welcome_res.json()
-    logger.info({"user_id": user_id, "user_language": language, "llm response": welcome_res_message})
+    logger.info({"user_id": user_id, "user_language": language, "welcome_res_message": welcome_res_message})
+
     ai_assistant = welcome_res_message["response"]
     logger.info({"user_id": user_id, "user_language": language, "ai_assistant": ai_assistant})
 
