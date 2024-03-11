@@ -601,11 +601,10 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
 
     if chat_history_messages:
         chat_history_messages = json.loads(chat_history_messages)
-        messages = [
-            {"role": "system", "content": welcome_prompt},
-            chat_history_messages,
-            {"role": "user", "content": user_input}
-        ]
+        messages = [{"role": "system", "content": welcome_prompt}]
+        for chat_message in chat_history_messages:
+            messages.append(chat_message)
+        messages.append({"role": "user", "content": user_input})
     else:
         chat_history_messages = []
         messages = [
