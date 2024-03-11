@@ -8,41 +8,40 @@ from pydub import AudioSegment
 from config_util import get_config_value
 from utils import *
 
-
 asr_mapping = {
     "bn": "ai4bharat/conformer-multilingual-indo_aryan-gpu--t4",
-    "en": "ai4bharat/whisper-medium-en--gpu--t4",
+    "en": "ai4bharat/whisper--gpu-t4",
     "gu": "ai4bharat/conformer-multilingual-indo_aryan-gpu--t4",
     "hi": "ai4bharat/conformer-hi-gpu--t4",
-    "kn": "ai4bharat/conformer-multilingual-dravidian-gpu--t4",
-    "ml": "ai4bharat/conformer-multilingual-dravidian-gpu--t4",
+    "kn": "ai4bharat/conformer-multilingual-dravidian--gpu-t4",
+    "ml": "ai4bharat/conformer-multilingual-dravidian--gpu-t4",
     "mr": "ai4bharat/conformer-multilingual-indo_aryan-gpu--t4",
     "or": "ai4bharat/conformer-multilingual-indo_aryan-gpu--t4",
     "pa": "ai4bharat/conformer-multilingual-indo_aryan-gpu--t4",
     "sa": "ai4bharat/conformer-multilingual-indo_aryan-gpu--t4",
-    "ta": "ai4bharat/conformer-multilingual-dravidian-gpu--t4",
-    "te": "ai4bharat/conformer-multilingual-dravidian-gpu--t4",
+    "ta": "ai4bharat/conformer-multilingual-dravidian--gpu-t4",
+    "te": "ai4bharat/conformer-multilingual-dravidian--gpu-t4",
     "ur": "ai4bharat/conformer-multilingual-indo_aryan-gpu--t4"
 }
-
-translation_serviceId = "ai4bharat/indictrans-v2-all-gpu--t4"
+asr_service_id = "ai4bharat/whisper--gpu-t4"
+tts_serviceId = "ai4bharat/indictrans--gpu-t4"
 
 tts_mapping = {
-    "as": "ai4bharat/indic-tts-coqui-indo_aryan-gpu--t4",
-    "bn": "ai4bharat/indic-tts-coqui-indo_aryan-gpu--t4",
-    "brx": "ai4bharat/indic-tts-coqui-misc-gpu--t4",
-    "en": "ai4bharat/indic-tts-coqui-misc-gpu--t4",
-    "gu": "ai4bharat/indic-tts-coqui-indo_aryan-gpu--t4",
-    "hi": "ai4bharat/indic-tts-coqui-indo_aryan-gpu--t4",
-    "kn": "ai4bharat/indic-tts-coqui-dravidian-gpu--t4",
-    "ml": "ai4bharat/indic-tts-coqui-dravidian-gpu--t4",
-    "mni": "ai4bharat/indic-tts-coqui-misc-gpu--t4",
-    "mr": "ai4bharat/indic-tts-coqui-indo_aryan-gpu--t4",
-    "or": "ai4bharat/indic-tts-coqui-indo_aryan-gpu--t4",
-    "pa": "ai4bharat/indic-tts-coqui-indo_aryan-gpu--t4",
-    "raj": "ai4bharat/indic-tts-coqui-indo_aryan-gpu--t4",
-    "ta": "ai4bharat/indic-tts-coqui-dravidian-gpu--t4",
-    "te": "ai4bharat/indic-tts-coqui-dravidian-gpu--t4"
+    "as": "ai4bharat/indic-tts-indo-aryan--gpu-t4",
+    "bn": "ai4bharat/indic-tts-indo-aryan--gpu-t4",
+    "brx": "ai4bharat/indic-tts-misc--gpu-t4",
+    "en": "ai4bharat/indic-tts-misc--gpu-t4",
+    "gu": "ai4bharat/indic-tts-indo-aryan--gpu-t4",
+    "hi": "ai4bharat/indic-tts-indo-aryan--gpu-t4",
+    "kn": "ai4bharat/indic-tts-dravidian--gpu-t4",
+    "ml": "ai4bharat/indic-tts-dravidian--gpu-t4",
+    "mni": "ai4bharat/indic-tts-misc--gpu-t4",
+    "mr": "ai4bharat/indic-tts-indo-aryan--gpu-t4",
+    "or": "ai4bharat/indic-tts-indo-aryan--gpu-t4",
+    "pa": "ai4bharat/indic-tts-indo-aryan--gpu-t4",
+    "raj": "ai4bharat/indic-tts-indo-aryan--gpu-t4",
+    "ta": "ai4bharat/indic-tts-dravidian--gpu-t4",
+    "te": "ai4bharat/indic-tts-dravidian--gpu-t4"
 }
 
 
@@ -80,6 +79,7 @@ def get_encoded_string(audio):
     os.remove(local_filename)
     os.remove(tmp_wav_filename)
     return encoded_string, wav_file_content
+
 
 def speech_to_text(encoded_string, input_language):
     start_time = time.time()
@@ -120,6 +120,7 @@ def speech_to_text(encoded_string, input_language):
         process_time = time.time() - start_time
         raise RequestError(e.response) from e
 
+
 def indic_translation(text, source, destination):
     if source == destination:
         return text
@@ -135,7 +136,7 @@ def indic_translation(text, source, destination):
                             "sourceLanguage": source,
                             "targetLanguage": destination
                         },
-                        "serviceId": translation_serviceId
+                        "serviceId": asr_mapping[source]
                     }
                 }
             ],
@@ -161,6 +162,7 @@ def indic_translation(text, source, destination):
         raise RequestError(e.response) from e
         # indic_text = google_translate_text(text, source, destination)
     return indic_text
+
 
 def text_to_speech(language, text, gender='female'):
     try:
@@ -214,4 +216,3 @@ def audio_input_to_text(audio_file, input_language):
     except:
         indic_text = None
     return indic_text
-
