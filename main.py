@@ -200,6 +200,7 @@ def capture_user_emotions(user_id: str, user_feedback: str, emotion_category: st
                 llm_base_path,
                 json={"model": gpt_model, "messages": messages, "stream": False},
             )
+            logger.info({"user_id": user_id, "user_language": language, "closure_res": closure_res})
             closure_res_message = closure_res.json()
             closure_message = closure_res_message["message"]["content"]
 
@@ -541,6 +542,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
                 llm_base_path,
                 json={"model": gpt_model, "messages": messages, "stream": False},
             )
+            logger.info({"user_id": user_id, "user_language": language, "nudge_res_message": nudge_res_message})
             nudge_res_message = nudge_res.json()
             nudge_message = nudge_res_message["message"]["content"]
             logger.info({"user_id": user_id, "user_language": language, "nudge_message": nudge_message})
@@ -617,7 +619,7 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
         llm_base_path,
         json={"model": gpt_model, "messages": messages, "stream": False},
     )
-
+    logger.info({"user_id": user_id, "user_language": language, "welcome_res": welcome_res})
     welcome_res_message = welcome_res.json()
     ai_assistant = welcome_res_message["message"]["content"]
     logger.info({"user_id": user_id, "user_language": language, "ai_assistant": ai_assistant})
@@ -720,6 +722,7 @@ def invoke_llm_feedback(user_id, language, current_session_id, user_input) -> Ge
         llm_base_path,
         json={"model": gpt_model, "messages": messages, "stream": False},
     )
+    logger.info({"user_id": user_id, "user_language": language, "feedback_res": feedback_res})
     feedback_res_message = feedback_res.json()
     ai_assistant = feedback_res_message["message"]["content"]
     logger.info({"user_id": user_id, "user_language": language, "feedback ai_assistant": ai_assistant})
