@@ -201,7 +201,7 @@ def capture_user_emotions(user_id: str, user_feedback: str, emotion_category: st
                 json={"model": gpt_model, "messages": messages, "stream": False},
             )
             closure_res_message = closure_res.json()
-            closure_message = closure_res_message["response"]
+            closure_message = closure_res_message["message"]["content"]
 
             logger.inf({"user_id": user_id, "language": language, "session_id": session_id, "closure_message": closure_message})
             next_message = closure_message
@@ -542,7 +542,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
                 json={"model": gpt_model, "messages": messages, "stream": False},
             )
             nudge_res_message = nudge_res.json()
-            nudge_message = nudge_res_message["response"]
+            nudge_message = nudge_res_message["message"]["content"]
             logger.info({"user_id": user_id, "user_language": language, "nudge_message": nudge_message})
 
         conversation_audio, conversation_text = process_outgoing_voice_manual(nudge_message, language)
@@ -617,12 +617,9 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
         llm_base_path,
         json={"model": gpt_model, "messages": messages, "stream": False},
     )
-    logger.info({"user_id": user_id, "user_language": language, "welcome_res": welcome_res, "type_welcome_res": type(welcome_res)})
-    logger.info({"user_id": user_id, "user_language": language, "welcome_res_message": welcome_res.content})
-    welcome_res_message = welcome_res.json()
-    logger.info({"user_id": user_id, "user_language": language, "welcome_res_message": welcome_res_message})
 
-    ai_assistant = welcome_res_message["response"]
+    welcome_res_message = welcome_res.json()
+    ai_assistant = welcome_res_message["message"]["content"]
     logger.info({"user_id": user_id, "user_language": language, "ai_assistant": ai_assistant})
 
     chat_history_messages.append({"role": "user", "content": user_input})
@@ -724,8 +721,7 @@ def invoke_llm_feedback(user_id, language, current_session_id, user_input) -> Ge
         json={"model": gpt_model, "messages": messages, "stream": False},
     )
     feedback_res_message = feedback_res.json()
-    logger.info({"user_id": user_id, "user_language": language, "feedback llm response": feedback_res_message})
-    ai_assistant = feedback_res_message["response"]
+    ai_assistant = feedback_res_message["message"]["content"]
     logger.info({"user_id": user_id, "user_language": language, "feedback ai_assistant": ai_assistant})
 
     chat_history_messages.append({"role": "user", "content": user_input})
@@ -744,8 +740,6 @@ def invoke_llm_feedback(user_id, language, current_session_id, user_input) -> Ge
 
     logger.info({"user_id": user_id, "user_language": language, "feedback content_response": content_response})
     return content_response
-
-
 
 
 def generate_sub_session_id(length=24):
