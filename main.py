@@ -703,11 +703,10 @@ def invoke_llm_feedback(user_id, language, current_session_id, user_input) -> Ge
 
     if chat_history_messages:
         chat_history_messages = json.loads(chat_history_messages)
-        messages = [
-            {"role": "system", "content": feedback_prompt},
-            chat_history_messages,
-            {"role": "user", "content": user_input}
-        ]
+        messages = [{"role": "system", "content": feedback_prompt}]
+        for chat_message in chat_history_messages:
+            messages.append(chat_message)
+        messages.append({"role": "user", "content": user_input})
     else:
         chat_history_messages = []
         messages = [
