@@ -738,7 +738,10 @@ def invoke_llm_feedback(user_id, language, current_session_id, user_input) -> Ge
         ai_assistant = ai_assistant.replace("\\", "").replace("message_to_user:", "").strip()
     if "<emotion_category>" in ai_assistant:
         strip_index = ai_assistant.index('<emotion_category>')
-        ai_assistant = ai_assistant[:strip_index].replace("message_to_user:", "")
+        ai_assistant = ai_assistant[:strip_index]
+    if "emotion_category:" in ai_assistant:
+        strip_index = ai_assistant.index('emotion_category:')
+        ai_assistant = ai_assistant[:strip_index]
     logger.info({"user_id": user_id, "user_language": language, "feedback ai_assistant": ai_assistant})
 
     chat_history_messages.append({"role": "user", "content": user_input})
