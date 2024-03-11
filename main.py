@@ -753,7 +753,7 @@ def invoke_llm_feedback(user_id, language, current_session_id, user_input) -> Ge
 
     audio_output_url, ai_reg_text = process_outgoing_voice_manual(ai_assistant, language)
 
-    if ai_assistant.startswith("Goodbye") and ai_assistant.endswith("See you soon!"):
+    if "Goodbye" in ai_assistant:
         clear_data(current_session_id + "_feedback")
 
     conversation_text = ai_reg_text
