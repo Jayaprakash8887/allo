@@ -202,7 +202,7 @@ def capture_user_emotions(user_id: str, user_feedback: str, emotion_category: st
             )
             logger.info({"user_id": user_id, "user_language": language, "closure_res": closure_res})
             closure_res_message = closure_res.json()
-            closure_message = closure_res_message["message"]["content"]
+            closure_message = closure_res_message["message"]["content"].strip()
             if "[" in closure_message:
                 strip_index = closure_message.index('[')
                 closure_message = closure_message[:strip_index]
@@ -546,7 +546,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
             )
             logger.info({"user_id": user_id, "user_language": language, "nudge_res": nudge_res})
             nudge_res_message = nudge_res.json()
-            nudge_message = nudge_res_message["message"]["content"]
+            nudge_message = nudge_res_message["message"]["content"].strip()
             if "[" in nudge_message:
                 strip_index = nudge_message.index('[')
                 nudge_message = nudge_message[:strip_index]
@@ -625,7 +625,7 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
     )
     logger.info({"user_id": user_id, "user_language": language, "welcome_res": welcome_res})
     welcome_res_message = welcome_res.json()
-    ai_assistant = welcome_res_message["message"]["content"]
+    ai_assistant = welcome_res_message["message"]["content"].strip()
     if "[" in ai_assistant:
         strip_index = ai_assistant.index('[')
         ai_assistant = ai_assistant[:strip_index]
@@ -730,7 +730,7 @@ def invoke_llm_feedback(user_id, language, current_session_id, user_input) -> Ge
     )
     logger.info({"user_id": user_id, "user_language": language, "feedback_res": feedback_res})
     feedback_res_message = feedback_res.json()
-    ai_assistant = feedback_res_message["message"]["content"]
+    ai_assistant = feedback_res_message["message"]["content"].strip()
     if "[" in ai_assistant:
         strip_index = ai_assistant.index('[')
         ai_assistant = ai_assistant[:strip_index]
