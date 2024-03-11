@@ -23,8 +23,6 @@ asr_mapping = {
     "te": "ai4bharat/conformer-multilingual-dravidian--gpu-t4",
     "ur": "ai4bharat/conformer-multilingual-indo_aryan-gpu--t4"
 }
-asr_service_id = "ai4bharat/whisper--gpu-t4"
-tts_serviceId = "ai4bharat/indictrans--gpu-t4"
 
 tts_mapping = {
     "as": "ai4bharat/indic-tts-indo-aryan--gpu-t4",
