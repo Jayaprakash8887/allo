@@ -198,7 +198,7 @@ def capture_user_emotions(user_id: str, user_feedback: str, emotion_category: st
             ]
             closure_res = requests.post(
                 llm_base_path,
-                json={"model": gpt_model, "messages": messages, "stream": True},
+                json={"model": gpt_model, "messages": messages, "stream": False},
             )
             closure_res_message = closure_res.json()
             closure_message = closure_res_message["response"]
@@ -539,7 +539,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
             messages = [{"role": "system", "content": nudge_user_prompt}]
             nudge_res = requests.post(
                 llm_base_path,
-                json={"model": gpt_model, "messages": messages, "stream": True},
+                json={"model": gpt_model, "messages": messages, "stream": False},
             )
             nudge_res_message = nudge_res.json()
             nudge_message = nudge_res_message["response"]
@@ -615,7 +615,7 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
 
     welcome_res = requests.post(
         llm_base_path,
-        json={"model": gpt_model, "messages": messages, "stream": True},
+        json={"model": gpt_model, "messages": messages, "stream": False},
     )
     logger.info({"user_id": user_id, "user_language": language, "welcome_res": welcome_res, "type_welcome_res": type(welcome_res)})
     logger.info({"user_id": user_id, "user_language": language, "welcome_res_message": welcome_res.content})
@@ -721,7 +721,7 @@ def invoke_llm_feedback(user_id, language, current_session_id, user_input) -> Ge
 
     feedback_res = requests.post(
         llm_base_path,
-        json={"model": gpt_model, "messages": messages, "stream": True},
+        json={"model": gpt_model, "messages": messages, "stream": False},
     )
     feedback_res_message = feedback_res.json()
     logger.info({"user_id": user_id, "user_language": language, "feedback llm response": feedback_res_message})
