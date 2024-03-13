@@ -731,7 +731,7 @@ def invoke_llm_feedback(user_id, language, current_session_id, user_input) -> Ge
     logger.info({"user_id": user_id, "user_language": language, "feedback_res": feedback_res})
     feedback_res_message = feedback_res.json()
     logger.info({"user_id": user_id, "user_language": language, "feedback_res_message": feedback_res_message})
-    ai_assistant = feedback_res_message["message"]["content"].strip()
+    ai_assistant = feedback_res_message["message"]["content"].strip().replace("\\", "")
     logger.info({"user_id": user_id, "user_language": language, "feedback_ai_assistant": ai_assistant})
     ai_assistant = json.loads(ai_assistant)
     logger.info({"user_id": user_id, "user_language": language, "post json load ai_assistant": ai_assistant})
