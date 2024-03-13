@@ -743,8 +743,8 @@ def invoke_llm_feedback(user_id, language, current_session_id, user_input) -> Ge
     # logger.info({"user_id": user_id, "user_language": language, "post json load ai_assistant": ai_assistant})
     # ai_assistant = ai_assistant.get("message_to_the_user")
     # logger.info({"user_id": user_id, "user_language": language, "message_ai_assistant": ai_assistant})
-    if " | " in ai_assistant:
-        strip_index = ai_assistant.index(' | ')
+    if "|" in ai_assistant:
+        strip_index = ai_assistant.index('|')
         ai_assistant = ai_assistant[:strip_index]
     if "[" in ai_assistant:
         strip_index = ai_assistant.index('[')
