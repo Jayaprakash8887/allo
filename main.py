@@ -643,7 +643,7 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
     if ai_assistant.startswith("Goodbye") and ai_assistant.endswith("See you soon!"):
         clear_data(current_session_id + "_welcome")
 
-    if "user_agreed" in ai_assistant.lower() or "user\\_agreed" in ai_assistant.lower():
+    if "user agreed" in ai_assistant.lower():
         content_response = func_get_content(user_id, language)
     else:
         conversation_text = ai_reg_text
