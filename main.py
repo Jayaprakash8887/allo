@@ -632,6 +632,9 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
     if "[" in ai_assistant:
         strip_index = ai_assistant.index('[')
         ai_assistant = ai_assistant[:strip_index]
+    if "(" in ai_assistant:
+        strip_index = ai_assistant.index('(')
+        ai_assistant = ai_assistant[:strip_index]
     logger.info({"user_id": user_id, "user_language": language, "ai_assistant": ai_assistant})
 
     chat_history_messages.append({"role": "user", "content": user_input})
