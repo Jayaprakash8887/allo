@@ -732,19 +732,27 @@ def invoke_llm_feedback(user_id, language, current_session_id, user_input) -> Ge
     feedback_res_message = feedback_res.json()
     logger.info({"user_id": user_id, "user_language": language, "feedback_res_message": feedback_res_message})
     ai_assistant = feedback_res_message["message"]["content"].strip()
-    if " | " in ai_assistant:
-        strip_index = ai_assistant.index(' | ')
-        ai_assistant = ai_assistant[:strip_index]
-    if "message_to_user:" in ai_assistant or "message\\_to\\_user":
-        ai_assistant = ai_assistant.replace("\\", "").replace("message_to_user:", "").strip()
-    if "Assistant:" in ai_assistant:
-        ai_assistant = ai_assistant.replace("Assistant:", "").strip()
-    if "<emotion_category>" in ai_assistant:
-        strip_index = ai_assistant.index('<emotion_category>')
-        ai_assistant = ai_assistant[:strip_index]
-    if "emotion_category:" in ai_assistant:
-        strip_index = ai_assistant.index('emotion_category:')
-        ai_assistant = ai_assistant[:strip_index]
+    logger.info({"user_id": user_id, "user_language": language, "feedback_ai_assistant": ai_assistant})
+    ai_assistant = json.loads(ai_assistant)
+    logger.info({"user_id": user_id, "user_language": language, "post json load ai_assistant": ai_assistant})
+    ai_assistant = ai_assistant.get("message_to_the_user")
+    logger.info({"user_id": user_id, "user_language": language, "message_to_the_user_ai_assistant": ai_assistant})
+    # if " | " in ai_assistant:
+    #     strip_index = ai_assistant.index(' | ')
+    #     ai_assistant = ai_assistant[:strip_index]
+    # if "[" in ai_assistant:
+    #     strip_index = ai_assistant.index('[')
+    #     ai_assistant = ai_assistant[:strip_index]
+    # if "message_to_user:" in ai_assistant or "message\\_to\\_user":
+    #     ai_assistant = ai_assistant.replace("\\", "").replace("message_to_user:", "").strip()
+    # if "Assistant:" in ai_assistant:
+    #     ai_assistant = ai_assistant.replace("Assistant:", "").strip()
+    # if "<emotion_category>" in ai_assistant:
+    #     strip_index = ai_assistant.index('<emotion_category>')
+    #     ai_assistant = ai_assistant[:strip_index]
+    # if "emotion_category:" in ai_assistant:
+    #     strip_index = ai_assistant.index('emotion_category:')
+    #     ai_assistant = ai_assistant[:strip_index]
     logger.info({"user_id": user_id, "user_language": language, "feedback ai_assistant": ai_assistant})
 
     chat_history_messages.append({"role": "user", "content": user_input})
