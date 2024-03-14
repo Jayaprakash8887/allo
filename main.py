@@ -562,7 +562,7 @@ async def submit_response(request: UserAnswerRequest) -> GetContentResponse:
         return content_response
     else:
         store_data(user_id + "_" + language + "_" + current_session_id + "_completed", "true")
-        return invoke_llm_feedback(user_id, language, current_session_id, 'user_completed')  # match language:
+        return invoke_llm_feedback(user_id, language, current_session_id, 'learning session completed')  # match language:
         #     case "kn":
         #         conversation_text = "ನೀವು ಮೌಲ್ಯಮಾಪನವನ್ನು ಪೂರ್ಣಗೊಳಿಸಿದ್ದೀರಿ! ಹೊಸದಾಗಿ ಪ್ರಾರಂಭಿಸಲು ಮರು-ಲಾಗಿನ್ ಮಾಡಿ."
         #         conversation_audio = "https://ax2cel5zyviy.compat.objectstorage.ap-hyderabad-1.oraclecloud.com/sbdjb-kathaasaagara/audio-output-20240228-064932.mp3"
