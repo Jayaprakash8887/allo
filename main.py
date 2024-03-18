@@ -623,8 +623,8 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
         llm_base_path,
         json={"model": gpt_model, "messages": messages, "stream": False},
     )
-    logger.info({"user_id": user_id, "user_language": language, "welcome_res": welcome_res})
     welcome_res_message = welcome_res.json()
+    logger.info({"user_id": user_id, "user_language": language, "welcome_res": welcome_res.json()})
     ai_assistant = welcome_res_message["message"]["content"].strip()
     if "[" in ai_assistant:
         strip_index = ai_assistant.index('[')
