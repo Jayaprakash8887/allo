@@ -626,9 +626,6 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
     logger.info({"user_id": user_id, "user_language": language, "welcome_res": welcome_res})
     welcome_res_message = welcome_res.json()
     ai_assistant = welcome_res_message["message"]["content"].strip()
-    if "=" in ai_assistant:
-        strip_index = ai_assistant.index('=')
-        ai_assistant = ai_assistant[(strip_index+1):]
     if "[" in ai_assistant:
         strip_index = ai_assistant.index('[')
         ai_assistant = ai_assistant[:strip_index]
@@ -646,7 +643,7 @@ def invoke_llm(user_id, language, current_session_id, user_input) -> GetContentR
     if ai_assistant.startswith("Goodbye") and ai_assistant.endswith("See you soon!"):
         clear_data(current_session_id + "_welcome")
 
-    if "user agreed" in ai_assistant.lower() or "user_agreed" in ai_assistant.lower() or "user\\_agreed" in ai_assistant.lower():
+    if "user agreed to start learning session" in ai_assistant.lower():
         content_response = func_get_content(user_id, language)
     else:
         conversation_text = ai_reg_text
